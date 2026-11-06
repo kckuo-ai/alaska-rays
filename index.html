@@ -116,11 +116,11 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   </div>
 </div>
 <div class="app">
-  <div id="map"><div id="mstatus" hidden></div><details class="mlegend" id="mlegend" open><summary>圖例</summary><div id="mlegendBody"></div></details></div>
+  <div id="map"><div id="mstatus" hidden></div><details class="mlegend" id="mlegend"><summary>圖例</summary><div id="mlegendBody"></div></details></div>
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-06 23:50</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:15</p>
     </div>
 
     <section class="block">
@@ -131,6 +131,12 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <option value="osm">OpenStreetMap 街道圖＋OSM 建築體（免金鑰）</option>
           <option value="ion">Google 寫實 3D，經 Cesium ion（需 ion token）</option>
           <option value="google">Google 寫實 3D，Map Tiles API（需 Google 金鑰）</option>
+        </select>
+      </label>
+      <label class="f" style="margin-top:8px">建築資料
+        <select id="bsrc">
+          <option value="kmz">網站內附建築輪廓（即時載入，建議）</option>
+          <option value="osm">即時向 OpenStreetMap 查詢（較慢，伺服器常忙碌）</option>
         </select>
       </label>
       <label class="f" id="keyWrap" hidden style="margin-top:8px"><span id="keyLbl">金鑰</span>
@@ -534,18 +540,28 @@ function centerAndRadius() {
   const r = Math.max(...pts.map(p => Math.hypot((p.lat - lat) * mPerLat, (p.lon - lon) * mPerLon)));
   return { lat, lon, r: Math.ceil(r + 200) };
 }
+async function loadBundled(note) {
+  status('載入內附建築輪廓…');
+  const res = await fetch('buildings_kmz.json');
+  if (!res.ok) throw new Error('內附建築檔讀取失敗（' + res.status + '）');
+  const polys = await res.json();
+  st.osmNote = note || '建築輪廓為網站內附資料（來自路測 KMZ 的 OSM 輪廓），沒有高度標籤，全部用預設高度，可點建築修改。';
+  return { elements: polys.map((poly, i) => ({ type: 'way', id: 'kmz' + i, tags: {}, geometry: poly.map(([lo, la]) => ({ lat: la, lon: lo })) })) };
+}
 async function fetchOSM() {
-  const { lat, lon, r } = centerAndRadius();
-  const q = `[out:json][timeout:60];(way["building"](around:${r},${lat},${lon});relation["building"](around:${r},${lat},${lon}););out tags geom;`;
+  const pts = [SITE.bs, ...ORIG_UES, ...V2.rows.map(r => ({ lat: r[1], lon: r[2] }))];
+  const mlat = 150 / 111320, mlon = 150 / (111320 * Math.cos(SITE.bs.lat * Math.PI / 180));
+  const bb = [Math.min(...pts.map(p => p.lat)) - mlat, Math.min(...pts.map(p => p.lon)) - mlon, Math.max(...pts.map(p => p.lat)) + mlat, Math.max(...pts.map(p => p.lon)) + mlon].map(v => v.toFixed(5)).join(',');
+  const q = `[out:json][timeout:25];(way["building"](${bb});relation["building"](${bb}););out tags geom;`;
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem('alaskaOSM') || 'null'); } catch (e) {}
   st.osmNote = '';
   if (cached && cached.q === q && Date.now() - cached.t < 7 * 864e5) return cached.data;
   const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
   let lastErr;
-  for (let round = 0; round < 2; round++) {
+  for (let round = 0; round < 1; round++) {
     for (const ep of eps) {
-      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 25000);
       try {
         status(`從 OpenStreetMap 抓取建築（${new URL(ep).hostname}${round ? '，重試' : ''}）…`);
         const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
@@ -560,14 +576,7 @@ async function fetchOSM() {
   }
   // fallbacks: an older cached download, then the building outlines bundled with the site
   if (cached && cached.data) { st.osmNote = 'OSM 伺服器暫時連不上，改用上次抓到的建築資料。'; return cached.data; }
-  try {
-    const res = await fetch('buildings_kmz.json');
-    if (res.ok) {
-      const polys = await res.json();
-      st.osmNote = 'OSM 伺服器暫時連不上，改用路測 KMZ 內附的建築輪廓（沒有高度資料，全部用預設高度）。';
-      return { elements: polys.map((poly, i) => ({ type: 'way', id: 'kmz' + i, tags: {}, geometry: poly.map(([lo, la]) => ({ lat: la, lon: lo })) })) };
-    }
-  } catch (e) {}
+  try { return await loadBundled('OSM 伺服器暫時連不上，改用網站內附的建築輪廓（沒有高度資料，全部用預設高度）。'); } catch (e) {}
   throw new Error('OpenStreetMap 連線失敗：' + (lastErr && lastErr.message || lastErr));
 }
 function heightOf(t) {
@@ -944,6 +953,7 @@ $('#secLayout').addEventListener('change', () => {
 $('#secSel').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; st.secSel = b.dataset.s; antChanged(); });
 syncAntUI();
 syncLbNote();
+if (window.innerWidth > 700) $('#mlegend').open = true;
 $('#mlegendBody').innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>` +
   `<div style="margin-top:6px">建築高度來源（點建築可修改）</div><div class="bl">` + Object.values(HSRC).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>' +
   `<div style="margin-top:6px">UE（大點）與 V2 實測點（小點，✕＝無服務）：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
@@ -1229,6 +1239,7 @@ function syncMode() {
 }
 try { const m = localStorage.getItem('bgMode'); if (m) $('#mode').value = m; } catch (e) {}
 $('#mode').addEventListener('change', syncMode);
+$('#bsrc').addEventListener('change', () => { if (st.osm) { st.osm = null; status('建築資料來源已變更，請按「載入地圖並計算」。'); } });
 syncMode();
 renderUEButtons();
 
@@ -1285,8 +1296,7 @@ $('#go').onclick = async () => {
   try {
     if (st.viewer && st.mode !== mode) resetViewer();
     if (!st.viewer) { status('載入地圖…'); await createViewer(mode, key); }
-    status('從 OpenStreetMap 抓取建築…');
-    const osmP = st.osm ? Promise.resolve(null) : fetchOSM();
+    const osmP = st.osm ? Promise.resolve(null) : ($('#bsrc').value === 'osm' ? fetchOSM() : loadBundled());
     if (st.h0 == null) {
       if (st.tileset) {
         const samples = await st.viewer.scene.sampleHeightMostDetailed(SITE.ues.map(u => Cesium.Cartographic.fromDegrees(u.lon, u.lat)));
