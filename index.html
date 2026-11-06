@@ -122,7 +122,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:45</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 01:00</p>
     </div>
 
     <section class="block">
@@ -272,13 +272,28 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <select id="optMode"><option value="fixed">三扇區固定 120°</option><option value="indep">各扇區獨立</option></select>
         </label>
         <label class="f">目標
-          <select id="optGoal"><option value="mean">所有 UE 平均分數最高</option><option value="min">最差的 UE 優先</option></select>
+          <select id="optGoal"><option value="mean">所有位置平均分數最高</option><option value="min">最差的位置優先</option><option value="zone">半徑內 RSRP 達標的點最多</option></select>
         </label>
         <label class="f">電子下傾上限 (°)<input type="number" id="optTiltMax" value="10" step="1"></label>
         <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="optUseM" checked>也納入 V2 實測點的位置（57 點，含無服務點）</label>
-        <label class="f">RSRP 權重 <output id="optWOut"></output><input type="range" id="optW" min="0" max="100" step="5" value="50"></label>
+        <label class="f" id="optWWrap">RSRP 權重 <output id="optWOut"></output><input type="range" id="optW" min="0" max="100" step="5" value="50"></label>
       </div>
-      <p class="sub" style="margin-top:6px">每個 UE 的分數 = RSRP 分數 × 權重 + SINR 分數 × (1 − 權重)。RSRP 從 −120 到 −80 dBm 線性對應 0–100 分，SINR 從 −5 到 25 dB 對應 0–100 分。</p>
+      <div id="zoneCtl" hidden style="margin-top:10px">
+        <table class="mini"><tr><th>規則</th><th>半徑 (m)</th><th>RSRP ≥ (dBm)</th></tr>
+          <tr><td><label class="chk"><input type="checkbox" id="z1on" checked>1</label></td><td><input type="number" id="z1r" value="100" min="5" step="5"></td><td><input type="number" id="z1t" value="-80" step="1"></td></tr>
+          <tr><td><label class="chk"><input type="checkbox" id="z2on" checked>2</label></td><td><input type="number" id="z2r" value="50" min="5" step="5"></td><td><input type="number" id="z2t" value="-75" step="1"></td></tr>
+        </table>
+        <div class="row2" style="margin-top:8px">
+          <label class="f">評估點
+            <select id="zPts"><option value="grid">半徑內均勻格點</option><option value="sites">半徑內的 UE 與實測點</option></select>
+          </label>
+          <label class="f">格點間距 (m)<input type="number" id="zStep" value="10" min="2" step="1"></label>
+          <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="zOut" checked>只評估室外（排除建築內的格點）</label>
+          <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="zShow" checked>在地圖上顯示評估點是否達標</label>
+        </div>
+        <p class="sub" style="margin-top:6px">分數 = 各規則半徑內 RSRP 達標的點數加總，半徑外的點不計。距離以基站水平距離計算。RSRP 門檻要先校準過才有意義（見「V2 實測對照」）。</p>
+      </div>
+      <p class="sub" id="optScoreNote" style="margin-top:6px">每個 UE 的分數 = RSRP 分數 × 權重 + SINR 分數 × (1 − 權重)。RSRP 從 −120 到 −80 dBm 線性對應 0–100 分，SINR 從 −5 到 25 dB 對應 0–100 分。</p>
       <div class="tools" style="margin-top:8px">
         <button type="button" class="primary" id="optRun">開始最佳化</button>
         <button type="button" id="optApply" hidden>套用最佳設定</button>
@@ -637,7 +652,7 @@ function buildModel() {
   RT.setBuildings(list, r + 300);
   const bi = RT.buildingAt(0, 0);
   bsBuilding = bi >= 0 ? RT.building(bi).src : -1;
-  st.list = list;
+  st.list = list; st.gridSig = '';
   if (bsBuilding >= 0) $('#bsH').value = list[bsBuilding].h.toFixed(1);
   st.cache = {};
 }
@@ -646,11 +661,12 @@ function txPos() {
   return [0, roof + (+$('#mast').value || 0), 0];
 }
 function uePos(i) {
+  if (typeof i === 'string' && i[0] === 'g') { const g = st.grid[+i.slice(1)]; return [g[0], UE_H, g[1]]; }
   if (typeof i === 'string') { const r = V2.rows[+i.slice(1)]; const [x, z] = toLocal(r[2], r[1]); return [x, UE_H, z]; }
   const [x, z] = toLocal(SITE.ues[i].lon, SITE.ues[i].lat); return [x, UE_H, z];
 }
 const isUE = k => typeof k === 'number';
-const tgtName = k => isUE(k) ? 'UE ' + (k + 1) : '實測點 S' + V2.rows[+k.slice(1)][0];
+const tgtName = k => isUE(k) ? 'UE ' + (k + 1) : k[0] === 'g' ? '格點 ' + (+k.slice(1) + 1) : '實測點 S' + V2.rows[+k.slice(1)][0];
 const pciSector = pci => { const a = antCfg(); if (a.mode === 'omni') return 0; const k = [0, 1, 2].find(k => +$('#pci' + k).value === pci); return k == null ? -1 : k; };
 function opts() {
   return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, relCut: REL_CUT };
@@ -748,6 +764,19 @@ function drawSite() {
       label: { text: (i + 1) + (lk ? '  ' + fmt(lk.rsrp, 0) : ''), font: '600 12px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     e.ueIndex = i;
   });
+  if (st.zoneViz && $('#zShow').checked) {
+    const zr = st.zoneViz.rules, c = lbCfg(), off = 10 * Math.log10(c.nre);
+    zr.forEach(r => {
+      const ring = []; for (let a = 0; a <= 360; a += 6) ring.push(toWorld([r.R * Math.sin(a * Math.PI / 180), 0.3, r.R * Math.cos(a * Math.PI / 180)]));
+      siteDS.entities.add({ polyline: { positions: ring, width: 2, arcType: Cesium.ArcType.NONE, material: new Cesium.PolylineDashMaterialProperty({ color: Cesium.Color.WHITE.withAlpha(.8), dashLength: 12 }) } });
+    });
+    st.zoneViz.keys.forEach(k => {
+      const r = traceUE(k), d = hdist(k), rsrp = Number.isFinite(r.prx[r.serve]) ? r.prx[r.serve] - off : -200;
+      const app = zr.filter(x => d <= x.R); if (!app.length) return;
+      const ok = app.every(x => rsrp >= x.T);
+      siteDS.entities.add({ position: toWorld(uePos(k)), point: { pixelSize: 6, color: Cesium.Color.fromCssColorString(ok ? '#3ddc84' : '#ff5e5e').withAlpha(.9), outlineColor: Cesium.Color.BLACK.withAlpha(.6), outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+    });
+  }
   if ($('#showM').checked) V2.rows.forEach((m, j) => {
     const on = st.sel === 'm' + j, col = m[3] == null ? '#6b7480' : rsrpLv(m[3])[2];
     const e = siteDS.entities.add({ position: toWorld(uePos('m' + j)),
@@ -1046,14 +1075,33 @@ applyAntModel(true);
 
 /* ===== optimizer ===== */
 function optKeys() { return SITE.ues.map((_, i) => i).concat($('#optUseM').checked ? V2.rows.map((_, j) => 'm' + j) : []); }
-function optPrep() {
+const hdist = k => { const p = uePos(k); return Math.hypot(p[0], p[2]); };
+function zoneRules() { return [1, 2].filter(i => $('#z' + i + 'on').checked).map(i => ({ R: Math.max(1, +$('#z' + i + 'r').value || 0), T: +$('#z' + i + 't').value })); }
+function zoneKeys() {
+  const rules = zoneRules(); if (!rules.length) return [];
+  const Rmax = Math.max(...rules.map(r => r.R));
+  if ($('#zPts').value === 'sites') return SITE.ues.map((_, i) => i).concat(V2.rows.map((_, j) => 'm' + j)).filter(k => hdist(k) <= Rmax);
+  const step = Math.max(2, +$('#zStep').value || 10), ex = $('#zOut').checked, sig = [Rmax, step, ex].join('|');
+  if (st.gridSig !== sig) {
+    Object.keys(st.cache).forEach(k => { if (k[0] === 'g') delete st.cache[k]; });
+    st.grid = []; st.zoneViz = null;
+    for (let x = -Math.floor(Rmax / step) * step; x <= Rmax; x += step) for (let z = -Math.floor(Rmax / step) * step; z <= Rmax; z += step) {
+      const d = Math.hypot(x, z); if (d > Rmax || d < 3) continue;
+      if (ex && RT.buildingAt(x, z) >= 0) continue;
+      st.grid.push([x, z]);
+    }
+    st.gridSig = sig;
+  }
+  return st.grid.map((_, i) => 'g' + i);
+}
+function optPrep(keys) {
   const c = lbCfg(), eirp = c.eirpTot;
-  return optKeys().map(i => {
+  return keys.map(i => {
     const g = geomUE(i);
     return { az: g.paths.map(p => p.az), el: g.paths.map(p => p.el), lin: g.paths.map(p => Math.pow(10, (eirp - p.pl) / 10)) };
   });
 }
-function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin, fb = 30, slav = 30) {
+function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin, fb = 30, slav = 30, zone = null) {
   let sum = 0, mn = Infinity, n = 0; const per = [];
   for (const u of U) {
     if (!u.lin.length) { per.push(null); continue; }
@@ -1075,6 +1123,19 @@ function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin, fb = 30, slav = 
     per.push({ rsrp, sinr, sc, k: k0 }); sum += sc; n++; if (sc < mn) mn = sc;
   }
   const mean = n ? sum / n : 0; if (!n) mn = 0;
+  if (zone) {
+    let sat = 0, den = 0, marg = 0; const rs = zone.rules.map(() => ({ sat: 0, den: 0 }));
+    per.forEach((q, i) => {
+      const rsrp = q ? q.rsrp : -200;
+      zone.rules.forEach((r, ri) => {
+        if (zone.dist[i] > r.R) return;
+        den++; rs[ri].den++;
+        if (rsrp >= r.T) { sat++; rs[ri].sat++; }
+        marg += Math.max(-20, Math.min(20, rsrp - r.T));
+      });
+    });
+    return { score: sat + (den ? marg / (den * 40) : 0) * 0.9, sat, den, rules: rs, mean, min: mn, per };
+  }
   return { score: goal === 'min' ? mn + mean * 0.01 : mean, mean, min: mn, per };
 }
 function heatColor(t) { const c = ramp(t); return [c.red * 255, c.green * 255, c.blue * 255]; }
@@ -1083,17 +1144,30 @@ async function runOpt() {
   if (antCfg().mode === 'omni') { status('全向天線沒有方位角和下傾角可以調整，請先把天線型式改成三扇區。', true); return; }
   $('#optRun').disabled = true; status('最佳化計算中…');
   await new Promise(r => setTimeout(r, 30));
-  const t0 = performance.now(), a = antCfg(), c = lbCfg(), U = optPrep();
-  const w = (+$('#optW').value) / 100, goal = $('#optGoal').value, tMax = Math.max(0, +$('#optTiltMax').value || 15);
-  const noiseLin = Math.pow(10, c.noise / 10), E = (azs, et) => optEval(U, azs, et.map(t => t + a.mech), a.hp, a.vp, w, goal, c.nre, noiseLin, a.fb, a.slav);
+  const goal = $('#optGoal').value, zoneMode = goal === 'zone';
+  const keys = zoneMode ? zoneKeys() : optKeys();
+  if (!keys.length) { status(zoneMode ? '半徑內沒有評估點，請加大半徑或勾選至少一條規則。' : '沒有可評估的位置。', true); $('#optRun').disabled = false; return; }
+  const t0 = performance.now();
+  for (let i = 0; i < keys.length; i++) {
+    geomUE(keys[i]);
+    if (i % 10 === 9) { status(`計算評估點的射線 ${i + 1}/${keys.length}…`); await new Promise(r => setTimeout(r, 0)); }
+  }
+  status('搜尋最佳方位角與下傾角…'); await new Promise(r => setTimeout(r, 0));
+  const a = antCfg(), c = lbCfg(), U = optPrep(keys);
+  const zinfo = zoneMode ? { rules: zoneRules(), dist: keys.map(hdist) } : null;
+  const w = (+$('#optW').value) / 100, tMax = Math.max(0, +$('#optTiltMax').value || 15);
+  const noiseLin = Math.pow(10, c.noise / 10), E = (azs, et) => optEval(U, azs, et.map(t => t + a.mech), a.hp, a.vp, w, goal, c.nre, noiseLin, a.fb, a.slav, zinfo);
   const before = E(a.azs, a.etilts);
   // 1) grid over S1 azimuth (0–119°, 3-fold symmetry) × common tilt
   const tSteps = Math.round(tMax / 0.5) + 1, heat = new Float32Array(120 * tSteps);
   let best = { score: -1 }, bAz = 0, bT = 0;
-  for (let az = 0; az < 120; az++) for (let ti = 0; ti < tSteps; ti++) {
-    const t = ti * 0.5, r = E([az, az + 120, az + 240], [t, t, t]);
-    heat[ti * 120 + az] = r.score;
-    if (r.score > best.score) { best = r; bAz = az; bT = t; }
+  for (let az = 0; az < 120; az++) {
+    for (let ti = 0; ti < tSteps; ti++) {
+      const t = ti * 0.5, r = E([az, az + 120, az + 240], [t, t, t]);
+      heat[ti * 120 + az] = r.score;
+      if (r.score > best.score) { best = r; bAz = az; bT = t; }
+    }
+    if (az % 12 === 11) { status(`搜尋方位角與下傾角 ${Math.round((az + 1) / 1.2)}%…`); await new Promise(r => setTimeout(r, 0)); }
   }
   let azs = [bAz, bAz + 120, bAz + 240], tilts = [bT, bT, bT];
   // 2) optional per-sector refinement (coordinate descent)
@@ -1101,6 +1175,7 @@ async function runOpt() {
     for (let round = 0; round < 3; round++) {
       let improved = false;
       for (let k = 0; k < 3; k++) {
+        status(`各扇區微調：第 ${round + 1} 輪，S${k + 1}…`); await new Promise(r => setTimeout(r, 0));
         for (let da = -60; da <= 60; da += 2) for (let ti = 0; ti < tSteps; ti++) {
           const A = azs.slice(), T = tilts.slice(); A[k] = azs[k] + da; T[k] = ti * 0.5;
           const r = E(A, T);
@@ -1112,23 +1187,30 @@ async function runOpt() {
   }
   azs = azs.map(v => ((Math.round(v) % 360) + 360) % 360);
   st.optBest = { azs, tilts, indep: $('#optMode').value === 'indep' };
+  st.zoneViz = zoneMode ? { keys, rules: zinfo.rules } : null;
   // render
-  const goalName = goal === 'min' ? '最差 UE 分數' : '平均分數';
-  const val = r => goal === 'min' ? r.min : r.mean;
+  const goalName = zoneMode ? '達標點數' : goal === 'min' ? '最差位置分數' : '平均分數';
+  const val = r => zoneMode ? r.sat : goal === 'min' ? r.min : r.mean;
   const d = val(best) - val(before);
+  const pct = r => r.den ? Math.round(r.sat / r.den * 100) + '%' : '—';
   let h = `<dl class="optres">` +
-    `<div><dt>${goalName}</dt><dd>${fmt(val(before), 0)} → ${fmt(val(best), 0)}<small class="${d >= 0 ? 'up' : 'down'}"> ${d >= 0 ? '+' : ''}${fmt(d, 0)}</small></dd></div>` +
+    (zoneMode
+      ? `<div><dt>${goalName}</dt><dd>${before.sat}/${before.den} → ${best.sat}/${best.den}<small class="${d >= 0 ? 'up' : 'down'}"> ${d >= 0 ? '+' : ''}${d}</small></dd></div>`
+      : `<div><dt>${goalName}</dt><dd>${fmt(val(before), 0)} → ${fmt(val(best), 0)}<small class="${d >= 0 ? 'up' : 'down'}"> ${d >= 0 ? '+' : ''}${fmt(d, 0)}</small></dd></div>`) +
     `<div><dt>建議方位角</dt><dd style="font-size:13px">${azs.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div>` +
     `<div><dt>建議電子下傾${a.mech ? `（另加機械 ${a.mech}°）` : ''}</dt><dd style="font-size:13px">${tilts.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div></dl>`;
-  h += '<div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><tr><th>位置</th><th>RSRP 前→後</th><th>SINR 前→後</th><th>分數</th></tr>' + best.per.map((q, i) => {
-    const nm = tgtName(optKeys()[i]).replace('實測點 ', '');
+  if (zoneMode) h += '<table style="margin-bottom:8px"><tr><th>規則</th><th>評估點</th><th>目前</th><th>最佳化後</th></tr>' + zinfo.rules.map((r, ri) =>
+    `<tr><td>${r.R} m 內 ≥ ${fmt(r.T, 0)} dBm</td><td>${best.rules[ri].den}</td><td>${before.rules[ri].sat}（${pct(before.rules[ri])}）</td><td>${best.rules[ri].sat}（${pct(best.rules[ri])}）</td></tr>`).join('') + '</table>';
+  if (!(zoneMode && keys[0][0] === 'g')) h += '<div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><tr><th>位置</th><th>RSRP 前→後</th><th>SINR 前→後</th><th>分數</th></tr>' + best.per.map((q, i) => {
+    const nm = tgtName(keys[i]).replace('實測點 ', '');
     if (!q) return `<tr><td>${nm}</td><td colspan="3" style="font-family:inherit;text-align:left">模型找不到路徑，不列入評分</td></tr>`;
     const b = before.per[i], dr = q.rsrp - b.rsrp, ds = q.sinr - b.sinr;
     return `<tr><td>${nm}<small>S${b.k + 1} → S${q.k + 1}</small></td><td>${fmt(b.rsrp)} → ${fmt(q.rsrp)}<small class="${dr >= 0 ? 'up' : 'down'}">${dr >= 0 ? '+' : ''}${fmt(dr)} dB</small></td>` +
       `<td>${fmt(b.sinr)} → ${fmt(q.sinr)}<small class="${ds >= 0 ? 'up' : 'down'}">${ds >= 0 ? '+' : ''}${fmt(ds)} dB</small></td><td>${fmt(b.sc, 0)} → ${fmt(q.sc, 0)}</td></tr>`;
   }).join('') + '</table></div>';
+  if (zoneMode && keys[0][0] === 'g') h += `<p class="sub">評估 ${keys.length} 個室${$('#zOut').checked ? '外' : '內外'}格點（間距 ${$('#zStep').value} m）。套用後，地圖上綠點為達標、紅點為未達標。</p>`;
   h += `<p class="sub" style="margin-top:10px">分數地圖：橫軸 S1 方位角 0–119°（三扇區每 120° 重複），縱軸電子下傾 0–${tMax}°（往下越大），白框為最佳點。</p><canvas id="optHeat" width="120" height="${tSteps}"></canvas>`;
-  h += `<p class="sub" style="margin-top:6px">共評估 ${$('#optMode').value === 'indep' ? '超過 ' : ''}${120 * tSteps} 組設定，${Math.round(performance.now() - t0)} ms。評估 ${optKeys().length} 個位置（${SITE.ues.length} 個 UE${$('#optUseM').checked ? ' + 57 個實測點' : ''}），結果只對應這些位置與模型假設。</p>`;
+  h += `<p class="sub" style="margin-top:6px">共評估 ${$('#optMode').value === 'indep' ? '超過 ' : ''}${120 * tSteps} 組設定，${Math.round(performance.now() - t0)} ms。${zoneMode ? `評估 ${keys.length} 個點` : `評估 ${keys.length} 個位置（${SITE.ues.length} 個 UE${$('#optUseM').checked ? ' + 57 個實測點' : ''}）`}，結果只對應這些位置與模型假設。</p>`;
   $('#optOut').innerHTML = h;
   const cv = $('#optHeat'), cx = cv.getContext('2d'), img = cx.createImageData(120, tSteps);
   let lo = Infinity, hi = -Infinity; heat.forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
@@ -1138,9 +1220,17 @@ async function runOpt() {
   cx.strokeStyle = '#fff'; cx.lineWidth = 1; cx.strokeRect(gAz - 1.5, gT - 1.5, 3, 3);
   cv.style.aspectRatio = `120 / ${Math.max(tSteps * 2, 30)}`;
   $('#optApply').hidden = false; $('#optRun').disabled = false;
-  status(`最佳化完成：${goalName} ${fmt(val(before), 0)} → ${fmt(val(best), 0)}。按「套用最佳設定」更新地圖。`);
+  status(`最佳化完成：${goalName} ${zoneMode ? before.sat + ' → ' + best.sat : fmt(val(before), 0) + ' → ' + fmt(val(best), 0)}。按「套用最佳設定」更新地圖。`);
+  if (zoneMode && st.osm) drawSite();
 }
 $('#optW').addEventListener('input', () => { $('#optWOut').textContent = ` ${$('#optW').value}%`; });
+function syncGoal() {
+  const z = $('#optGoal').value === 'zone';
+  $('#zoneCtl').hidden = !z; $('#optWWrap').hidden = z; $('#optScoreNote').hidden = z;
+  $('#optUseM').closest('label').hidden = z;
+}
+$('#optGoal').addEventListener('change', syncGoal); syncGoal();
+$('#zShow').addEventListener('change', () => { if (st.osm) drawSite(); });
 $('#optWOut').textContent = ` ${$('#optW').value}%`;
 $('#optRun').onclick = () => runOpt().catch(e => { console.error(e); status('最佳化失敗：' + e.message, true); $('#optRun').disabled = false; });
 $('#optApply').onclick = () => {
