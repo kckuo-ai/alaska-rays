@@ -122,7 +122,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 01:00</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 01:05</p>
     </div>
 
     <section class="block">
@@ -774,7 +774,7 @@ function drawSite() {
       const r = traceUE(k), d = hdist(k), rsrp = Number.isFinite(r.prx[r.serve]) ? r.prx[r.serve] - off : -200;
       const app = zr.filter(x => d <= x.R); if (!app.length) return;
       const ok = app.every(x => rsrp >= x.T);
-      siteDS.entities.add({ position: toWorld(uePos(k)), point: { pixelSize: 6, color: Cesium.Color.fromCssColorString(ok ? '#3ddc84' : '#ff5e5e').withAlpha(.9), outlineColor: Cesium.Color.BLACK.withAlpha(.6), outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+      siteDS.entities.add({ position: toWorld(uePos(k)), point: { pixelSize: 4, color: Cesium.Color.fromCssColorString(ok ? '#3ddc84' : '#ff5e5e').withAlpha(.85), outlineWidth: 0, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     });
   }
   if ($('#showM').checked) V2.rows.forEach((m, j) => {
@@ -1010,7 +1010,8 @@ syncLbNote();
 if (window.innerWidth > 700) $('#mlegend').open = true;
 $('#mlegendBody').innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>` +
   `<div style="margin-top:6px">建築高度來源（點建築可修改）</div><div class="bl">` + Object.values(HSRC).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>' +
-  `<div style="margin-top:6px">UE（大點）與 V2 實測點（小點，✕＝無服務）：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
+  `<div style="margin-top:6px">最佳化評估格點（虛線圓為規則半徑）</div><div class="bl"><i style="background:#3ddc84;border-radius:50%"></i><span>達標</span><i style="background:#ff5e5e;border-radius:50%"></i><span>未達標</span></div>` +
+  `<div style="margin-top:6px">UE（大點，標籤：編號 預測 RSRP）與 V2 實測點（小點，標籤：S 點號 實測 RSRP，灰＝無服務）：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
 // Number fields recalc 0.5 s after typing stops, and only when the value actually changed
 const LIVE_SKIP = new Set(['ueLat', 'ueLon', 'key']);
 document.addEventListener('change', e => {
