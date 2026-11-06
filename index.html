@@ -120,7 +120,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:20</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:40</p>
     </div>
 
     <section class="block">
@@ -155,8 +155,8 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <div class="row2">
         <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
         <label class="f">RU 每埠輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
-        <label class="f">發射埠數（共用 SAS 上限）<input type="number" id="nPort" value="1" min="1" step="1"></label>
-        <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17" step="0.5"></label>
+        <label class="f">發射埠數（共用 SAS 上限）<input type="number" id="nPort" value="4" min="1" step="1"></label>
+        <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17.7" step="0.1"></label>
         <label class="f">饋線與接頭損耗 (dB)<input type="number" id="cableL" value="1" step="0.5"></label>
         <label class="f">SAS 授權 maxEirp (dBm/MHz)<input type="number" id="sasE" value="37" step="1"></label>
         <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
@@ -183,6 +183,13 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 
     <section class="block">
       <h2>基站天線</h2>
+      <label class="f">天線型號
+        <select id="antModel">
+          <option value="aw3161" selected>Alpha Wireless AW3161-E-F-V2（3.3–3.8 GHz）</option>
+          <option value="generic">通用面板（自訂參數）</option>
+        </select>
+      </label>
+      <p class="sub" id="antModelNote" style="margin:4px 0 8px"></p>
       <label class="f">天線型式
         <select id="antMode"><option value="sector">三扇區面板（間隔 120°）</option><option value="omni">全向</option></select>
       </label>
@@ -192,10 +199,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         </label>
         <div id="fixedCtl" style="display:flex;flex-direction:column;gap:10px">
           <label class="f">S1 方位角（正北順時針）<output id="azOut"></output><input type="range" id="az" min="0" max="359" step="1" value="30"></label>
-          <label class="f">機械下傾角 <output id="tiltOut"></output><input type="range" id="tilt" min="0" max="20" step="0.5" value="4"></label>
+          <label class="f"><span id="tiltLbl">電子下傾 eRET</span> <output id="tiltOut"></output><input type="range" id="tilt" min="0" max="10" step="0.5" value="4"></label>
         </div>
         <div id="indepCtl" hidden>
-          <table class="mini"><tr><th></th><th>方位角 (°)</th><th>下傾角 (°)</th></tr>
+          <table class="mini"><tr><th></th><th>方位角 (°)</th><th>電子下傾 (°)</th></tr>
             <tr><td>S1</td><td><input type="number" id="az0" step="1"></td><td><input type="number" id="tl0" step="0.5"></td></tr>
             <tr><td>S2</td><td><input type="number" id="az1" step="1"></td><td><input type="number" id="tl1" step="0.5"></td></tr>
             <tr><td>S3</td><td><input type="number" id="az2" step="1"></td><td><input type="number" id="tl2" step="0.5"></td></tr>
@@ -203,7 +210,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         </div>
         <div class="row2">
           <label class="f">水平 3 dB 波束寬 (°)<input type="number" id="hpbw" value="65" step="5"></label>
-          <label class="f">垂直 3 dB 波束寬 (°)<input type="number" id="vpbw" value="10" step="1"></label>
+          <label class="f">垂直 3 dB 波束寬 (°)<input type="number" id="vpbw" value="7" step="1"></label>
+          <label class="f">機械下傾（支架）(°)<input type="number" id="mtilt" value="0" step="0.5"></label>
+          <label class="f">前後比 (dB)<input type="number" id="fb" value="30" step="1"></label>
+          <label class="f">上旁瓣抑制 (dB)<input type="number" id="slav" value="18" step="1"></label>
           <label class="f">面板離桅杆中心 (m)<input type="number" id="panelOff" value="0.5" step="0.1"></label>
         </div>
         <div class="row2">
@@ -262,7 +272,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <label class="f">目標
           <select id="optGoal"><option value="mean">所有 UE 平均分數最高</option><option value="min">最差的 UE 優先</option></select>
         </label>
-        <label class="f">下傾角上限 (°)<input type="number" id="optTiltMax" value="15" step="1"></label>
+        <label class="f">電子下傾上限 (°)<input type="number" id="optTiltMax" value="10" step="1"></label>
         <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="optUseM" checked>也納入 V2 實測點的位置（57 點，含無服務點）</label>
         <label class="f">RSRP 權重 <output id="optWOut"></output><input type="range" id="optW" min="0" max="100" step="5" value="50"></label>
       </div>
@@ -304,7 +314,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <ul class="notes">
         <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
         <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
-        <li>RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
+        <li>下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
         <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
@@ -654,16 +664,18 @@ const wrap180 = a => ((a + 180) % 360 + 360) % 360 - 180;
 function antCfg() {
   const az = +$('#az').value || 0, tilt = +$('#tilt').value || 0, indep = $('#secLayout').value === 'indep';
   const azs = indep ? [0, 1, 2].map(k => +$('#az' + k).value || 0) : [az, az + 120, az + 240];
-  const tilts = indep ? [0, 1, 2].map(k => +$('#tl' + k).value || 0) : [tilt, tilt, tilt];
-  return { mode: $('#antMode').value, indep, az, tilt, azs, tilts,
+  const etilts = indep ? [0, 1, 2].map(k => +$('#tl' + k).value || 0) : [tilt, tilt, tilt];
+  const mech = +$('#mtilt').value || 0, tilts = etilts.map(t => t + mech);
+  const fb = Math.max(5, +$('#fb').value || 30), slav = Math.max(5, +$('#slav').value || 30);
+  return { mode: $('#antMode').value, indep, az, tilt, azs, etilts, mech, tilts, fb, slav,
     hp: Math.max(5, +$('#hpbw').value || 65), vp: Math.max(2, +$('#vpbw').value || 10), off: +$('#panelOff').value || 0 };
 }
 const sectorAz = (a, k) => ((a.azs[k] % 360) + 360) % 360;
 function patt(a, k, p) {
   if (a.mode === 'omni') return 0;
-  const AH = -Math.min(12 * (wrap180(p.az - sectorAz(a, k)) / a.hp) ** 2, 30);
-  const AV = -Math.min(12 * ((-p.el - a.tilts[k]) / a.vp) ** 2, 30);
-  return -Math.min(-(AH + AV), 30);
+  const AH = -Math.min(12 * (wrap180(p.az - sectorAz(a, k)) / a.hp) ** 2, a.fb);
+  const AV = -Math.min(12 * ((-p.el - a.tilts[k]) / a.vp) ** 2, a.slav);
+  return -Math.min(-(AH + AV), a.fb);
 }
 function traceUE(i) {
   const g = geomUE(i), a = antCfg(), eirp = eirpTot(), K = a.mode === 'omni' ? 1 : 3, per = [];
@@ -1010,6 +1022,27 @@ $('#ueApply').onclick = () => {
 };
 $('#ueReset').onclick = () => { if (st.osm && st.viewer && isUE(st.sel)) setUE(st.sel, ORIG_UES[st.sel].lat, ORIG_UES[st.sel].lon); };
 
+/* ===== antenna model presets ===== */
+const ANT_MODELS = {
+  aw3161: { antG: 17.7, hpbw: 65, vpbw: 7, fb: 30, slav: 18, nPort: 4, tiltMax: 10,
+    note: '規格：17.7 dBi（0° 時 17.9、10° 時 17.6）、水平 65°、垂直 7°、遠端電子下傾 0–10°、前後比 > 30 dB、上旁瓣抑制 > 18 dB、±45° 雙極化 4 埠（4×4 MIMO）。' }
+};
+function applyAntModel(init) {
+  const m = ANT_MODELS[$('#antModel').value];
+  $('#tiltLbl').textContent = m ? '電子下傾 eRET' : '下傾角';
+  $('#tilt').max = m ? m.tiltMax : 20;
+  if (+$('#tilt').value > +$('#tilt').max) $('#tilt').value = $('#tilt').max;
+  $('#antModelNote').textContent = m ? m.note : '自訂天線參數。';
+  if (!m || init) return;
+  ['antG', 'hpbw', 'vpbw', 'fb', 'slav', 'nPort'].forEach(k => { $('#' + k).value = m[k]; });
+  $('#optTiltMax').value = m.tiltMax;
+  syncLbNote(); st.cache = {};
+  antChanged(); if (st.osm && st.viewer) refresh(false);
+}
+$('#antModel').addEventListener('change', () => applyAntModel(false));
+['#mtilt', '#fb', '#slav'].forEach(sel => $(sel).addEventListener('change', antChanged));
+applyAntModel(true);
+
 /* ===== optimizer ===== */
 function optKeys() { return SITE.ues.map((_, i) => i).concat($('#optUseM').checked ? V2.rows.map((_, j) => 'm' + j) : []); }
 function optPrep() {
@@ -1019,7 +1052,7 @@ function optPrep() {
     return { az: g.paths.map(p => p.az), el: g.paths.map(p => p.el), lin: g.paths.map(p => Math.pow(10, (eirp - p.pl) / 10)) };
   });
 }
-function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin) {
+function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin, fb = 30, slav = 30) {
   let sum = 0, mn = Infinity, n = 0; const per = [];
   for (const u of U) {
     if (!u.lin.length) { per.push(null); continue; }
@@ -1028,8 +1061,8 @@ function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin) {
       const elB = -u.el[j];
       for (let k = 0; k < 3; k++) {
         let d = u.az[j] - azs[k]; d = ((d + 180) % 360 + 360) % 360 - 180;
-        const AH = Math.min(12 * (d / hp) ** 2, 30), AV = Math.min(12 * ((elB - tilts[k]) / vp) ** 2, 30);
-        S[k] += u.lin[j] * Math.pow(10, -Math.min(AH + AV, 30) / 10);
+        const AH = Math.min(12 * (d / hp) ** 2, fb), AV = Math.min(12 * ((elB - tilts[k]) / vp) ** 2, slav);
+        S[k] += u.lin[j] * Math.pow(10, -Math.min(AH + AV, fb) / 10);
       }
     }
     let k0 = 0; if (S[1] > S[k0]) k0 = 1; if (S[2] > S[k0]) k0 = 2;
@@ -1051,8 +1084,8 @@ async function runOpt() {
   await new Promise(r => setTimeout(r, 30));
   const t0 = performance.now(), a = antCfg(), c = lbCfg(), U = optPrep();
   const w = (+$('#optW').value) / 100, goal = $('#optGoal').value, tMax = Math.max(0, +$('#optTiltMax').value || 15);
-  const noiseLin = Math.pow(10, c.noise / 10), E = (azs, tilts) => optEval(U, azs, tilts, a.hp, a.vp, w, goal, c.nre, noiseLin);
-  const before = E(a.azs, a.tilts);
+  const noiseLin = Math.pow(10, c.noise / 10), E = (azs, et) => optEval(U, azs, et.map(t => t + a.mech), a.hp, a.vp, w, goal, c.nre, noiseLin, a.fb, a.slav);
+  const before = E(a.azs, a.etilts);
   // 1) grid over S1 azimuth (0–119°, 3-fold symmetry) × common tilt
   const tSteps = Math.round(tMax / 0.5) + 1, heat = new Float32Array(120 * tSteps);
   let best = { score: -1 }, bAz = 0, bT = 0;
@@ -1085,7 +1118,7 @@ async function runOpt() {
   let h = `<dl class="optres">` +
     `<div><dt>${goalName}</dt><dd>${fmt(val(before), 0)} → ${fmt(val(best), 0)}<small class="${d >= 0 ? 'up' : 'down'}"> ${d >= 0 ? '+' : ''}${fmt(d, 0)}</small></dd></div>` +
     `<div><dt>建議方位角</dt><dd style="font-size:13px">${azs.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div>` +
-    `<div><dt>建議下傾角</dt><dd style="font-size:13px">${tilts.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div></dl>`;
+    `<div><dt>建議電子下傾${a.mech ? `（另加機械 ${a.mech}°）` : ''}</dt><dd style="font-size:13px">${tilts.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div></dl>`;
   h += '<div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><tr><th>位置</th><th>RSRP 前→後</th><th>SINR 前→後</th><th>分數</th></tr>' + best.per.map((q, i) => {
     const nm = tgtName(optKeys()[i]).replace('實測點 ', '');
     if (!q) return `<tr><td>${nm}</td><td colspan="3" style="font-family:inherit;text-align:left">模型找不到路徑，不列入評分</td></tr>`;
@@ -1093,7 +1126,7 @@ async function runOpt() {
     return `<tr><td>${nm}<small>S${b.k + 1} → S${q.k + 1}</small></td><td>${fmt(b.rsrp)} → ${fmt(q.rsrp)}<small class="${dr >= 0 ? 'up' : 'down'}">${dr >= 0 ? '+' : ''}${fmt(dr)} dB</small></td>` +
       `<td>${fmt(b.sinr)} → ${fmt(q.sinr)}<small class="${ds >= 0 ? 'up' : 'down'}">${ds >= 0 ? '+' : ''}${fmt(ds)} dB</small></td><td>${fmt(b.sc, 0)} → ${fmt(q.sc, 0)}</td></tr>`;
   }).join('') + '</table></div>';
-  h += `<p class="sub" style="margin-top:10px">分數地圖：橫軸 S1 方位角 0–119°（三扇區每 120° 重複），縱軸共同下傾角 0–${tMax}°（往下越大），白框為最佳點。</p><canvas id="optHeat" width="120" height="${tSteps}"></canvas>`;
+  h += `<p class="sub" style="margin-top:10px">分數地圖：橫軸 S1 方位角 0–119°（三扇區每 120° 重複），縱軸電子下傾 0–${tMax}°（往下越大），白框為最佳點。</p><canvas id="optHeat" width="120" height="${tSteps}"></canvas>`;
   h += `<p class="sub" style="margin-top:6px">共評估 ${$('#optMode').value === 'indep' ? '超過 ' : ''}${120 * tSteps} 組設定，${Math.round(performance.now() - t0)} ms。評估 ${optKeys().length} 個位置（${SITE.ues.length} 個 UE${$('#optUseM').checked ? ' + 57 個實測點' : ''}），結果只對應這些位置與模型假設。</p>`;
   $('#optOut').innerHTML = h;
   const cv = $('#optHeat'), cx = cv.getContext('2d'), img = cx.createImageData(120, tSteps);
