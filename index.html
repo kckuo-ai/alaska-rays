@@ -19,6 +19,11 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.
 .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
 @media (max-width:900px){.app{grid-template-columns:minmax(0,1fr);grid-template-rows:65vh auto;height:auto}.panel{border-left:0;border-top:1px solid var(--line)}}
 html,body{overflow-x:hidden}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;max-width:min(92vw,520px);
+  background:#f3f5f7;color:#10151b;border-radius:6px;padding:8px 12px;font-size:13px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.mlegend{position:absolute;left:8px;top:8px;z-index:5;background:rgba(16,21,27,.85);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:11px/1.3 var(--mono);color:var(--muted);pointer-events:none}
+.mlegend .bar{width:140px;height:8px;border-radius:2px;margin:4px 0 2px;background:linear-gradient(90deg,#5b6cff,#e0479e,#ffcc4d)}
+.mlegend .ends{display:flex;justify-content:space-between}
 .panel,.block,.row2>*,.tools>*{min-width:0}
 #status,#lbNote{overflow-wrap:anywhere}
 #map{position:relative;min-height:360px}
@@ -67,6 +72,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 </style>
 </head>
 <body>
+<div id="toast" hidden></div>
 <div class="app">
   <div id="map"></div>
   <aside class="panel">
@@ -514,6 +520,7 @@ function drawBuildings() {
       outline: true, outlineColor: st.tileset ? Cesium.Color.CYAN.withAlpha(.55) : Cesium.Color.fromCssColorString('#5f7184') } });
   });
 }
+const RAY_MIN = -125, RAY_MAX = -70;
 const SEC_COL = ['#ffb347', '#7ee081', '#c792ea'].map(c => Cesium.Color.fromCssColorString(c));
 function panelPos(k) {
   const a = antCfg(), t = txPos();
@@ -528,7 +535,7 @@ function drawRays() {
     ? SITE.ues.map((_, i) => { const r = traceUE(i); return { r, kept: r.kept.slice(0, TOP_ALL) }; })
     : [(() => { const r = traceUE(st.sel); return { r, kept: r.kept }; })()];
   sets.forEach(({ r, kept }) => kept.forEach(p => {
-    const w = 1 + p.rel / REL_CUT, col = ramp(w), pts = p.pts.slice();
+    const w = Math.max(0, Math.min(1, (lbCfg().eirpRE - p.pl - RAY_MIN) / (RAY_MAX - RAY_MIN))), col = ramp(w), pts = p.pts.slice();
     pts[0] = panelPos(r.sector);
     const e = raysDS.entities.add({ polyline: {
       positions: pts.map(toWorld), width: 2 + 4 * w, arcType: Cesium.ArcType.NONE,
@@ -564,13 +571,13 @@ function renderPanel() {
       `<div><dt>通道</dt><dd>${c.bw}<small>MHz · ${c.nrb} RB</small></dd></div><div><dt>總 EIRP</dt><dd>${fmt(c.eirpTot)}<small>dBm</small></dd></div>` +
       `<div style="grid-column:1/-1"><dt>RSRP 分級（dBm）</dt><dd style="font:12px var(--body)">${RSRP_LV.map((x, k) => `<span class="sec" style="background:${x[2]}"></span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)}`).join('　')}</dd></div>`;
     $('#tblTitle').textContent = '各 UE';
-    $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>RSRP</th><th>SINR</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
+    $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>RSRP</th><th>SINR / SNR</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
       const r = traceUE(i), s = stats(r.kept), d = Math.hypot(...uePos(i).map((v, k) => v - tx[k]));
       const secTag = r.omni ? '' : `<small><span class="sec" style="background:${SEC_COL[r.sector].toCssHexString()}"></span>S${r.sector + 1}</small>`;
       if (!s) return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit" colspan="3">無有效路徑（穿越超過 4 面）</td></tr>`;
       const lk = link(r), lv = rsrpLv(lk.rsrp);
       return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}${secTag}</td><td>${fmt(d, 0)} m<small style="font-family:var(--body)">${describe(s.best).label}</small></td>` +
-        `<td><span class="sec" style="background:${lv[2]}"></span>${fmt(lk.rsrp)}<small>dBm · ${lv[1]}</small></td><td>${fmt(lk.hasI ? lk.sinr : lk.snr)}<small>dB</small></td><td>${fmt(s.rms)} ns</td></tr>`;
+        `<td><span class="sec" style="background:${lv[2]}"></span>${fmt(lk.rsrp)}<small>dBm · ${lv[1]}</small></td><td>${lk.hasI ? fmt(lk.sinr) : '—'}<small>SNR ${fmt(lk.snr)} dB</small></td><td>${fmt(s.rms)} ns</td></tr>`;
     }).join('');
     return;
   }
@@ -622,6 +629,35 @@ function refresh(rebuild) {
   if (rebuild) buildModel();
   setDispFrame();
   drawSite(); drawBuildings(); drawRays(); renderUEButtons(); renderPanel(); syncUEEdit(); st.hi = null; highlight(null);
+  reportDelta();
+}
+let toastT;
+function toast(html) { const t = $('#toast'); t.innerHTML = html; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
+function snapshot() { return SITE.ues.map((u, i) => { const lk = link(traceUE(i)); return { key: u.lat + ',' + u.lon, v: lk ? { RSRP: lk.rsrp, SINR: lk.hasI ? lk.sinr : null, SNR: lk.snr } : null }; }); }
+function reportDelta() {
+  const now = snapshot(), last = st.snap, sel = st.sel; st.snap = now;
+  if (!last) return;
+  // compare against the state before this burst of edits (e.g. a whole slider drag)
+  if (!st.base) st.base = last;
+  const prev = st.base;
+  clearTimeout(st.baseT); st.baseT = setTimeout(() => { st.base = null; }, 1500);
+  const idx = sel === 'all' ? now.map((_, i) => i) : [sel];
+  const lines = [];
+  const unit = m => m === 'RSRP' ? ' dBm' : ' dB';
+  if (sel !== 'all') {
+    const a = prev[sel], b = now[sel];
+    if (!a.v || !b.v) return;
+    ['RSRP', 'SINR', 'SNR'].forEach(m => { if (a.v[m] == null || b.v[m] == null) return; const d = b.v[m] - a.v[m]; if (Math.abs(d) >= .05) lines.push(`${m} ${fmt(a.v[m])} → <b>${fmt(b.v[m])}</b>${unit(m)}（${d > 0 ? '+' : ''}${fmt(d)}）`); });
+    if (lines.length) toast(`UE ${sel + 1}：` + lines.join('<br>'));
+    return;
+  }
+  ['RSRP', 'SINR', 'SNR'].forEach(m => {
+    const ds = idx.filter(i => prev[i].key === now[i].key && prev[i].v && now[i].v && prev[i].v[m] != null && now[i].v[m] != null).map(i => now[i].v[m] - prev[i].v[m]);
+    if (!ds.length) return;
+    const avg = ds.reduce((x, y) => x + y, 0) / ds.length, mx = ds.reduce((x, y) => Math.abs(y) > Math.abs(x) ? y : x, 0);
+    if (Math.abs(mx) >= .05) lines.push(`${m} 平均 ${avg > 0 ? '+' : ''}${fmt(avg)} dB，最大 ${mx > 0 ? '+' : ''}${fmt(mx)} dB`);
+  });
+  if (lines.length) toast('全部 UE：' + lines.join('<br>'));
 }
 function syncAntUI() {
   const a = antCfg();
@@ -777,6 +813,9 @@ async function createViewer(mode, key) {
     const p = viewer.scene.pick(m.position); if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   initFrames();
+  const lg = document.createElement('div'); lg.className = 'mlegend';
+  lg.innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>`;
+  document.getElementById('map').appendChild(lg);
   const c = centerAndRadius();
   viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 60), c.r),
     { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(15), Cesium.Math.toRadians(-38), c.r * 2.4), duration: 0 });
