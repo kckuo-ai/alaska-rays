@@ -26,13 +26,16 @@ html,body{overflow-x:hidden}
 .mlegend .ends{display:flex;justify-content:space-between}
 .mlegend .bl{display:grid;grid-template-columns:10px auto;gap:2px 6px;align-items:center;margin-top:6px}
 .mlegend .bl i{width:10px;height:10px;border-radius:2px;display:block}
-#bsheet{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:60;width:min(94vw,460px);
+#bsheet{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:60;width:min(calc(100vw - 20px),460px);
   background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
 #bsheet .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #bsheet .hd b{font-size:14px;overflow-wrap:anywhere}
 #bsheet p{margin:6px 0 10px;color:var(--muted);font-size:12px}
-#bsheet .rw{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
-#bsheet .rw label{flex:1 1 120px}
+#bsheet .rw{display:flex;gap:8px;align-items:center}
+#bsheet .rw input{width:5.5em;flex:none}
+#bsheet .rw .u{color:var(--muted);font-size:13px}
+#bsheet .rw button{white-space:nowrap}
+@media (max-width:900px){select,input[type=text],input[type=password],input[type=number]{font-size:16px}}
 .panel,.block,.row2>*,.tools>*{min-width:0}
 #status,#lbNote{overflow-wrap:anywhere}
 #map{position:relative;min-height:360px}
@@ -86,9 +89,9 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <div class="hd"><b id="bhTitle"></b><button type="button" id="bhClose">關閉</button></div>
   <p id="bhInfo"></p>
   <div class="rw">
-    <label class="f">建築高度 (m)<input type="number" id="bhIn" step="0.5" min="1"></label>
+    <input type="number" id="bhIn" step="0.5" min="1" inputmode="decimal" aria-label="建築高度（公尺）"><span class="u">m</span>
     <button type="button" class="primary" id="bhSave">套用</button>
-    <button type="button" id="bhClear">改回 OSM／預設</button>
+    <button type="button" id="bhClear">還原</button>
   </div>
 </div>
 <div class="app">
@@ -557,6 +560,7 @@ function openBSheet(i) {
   $('#bhInfo').innerHTML = `OSM ${b.id}<br>目前 ${fmt(L.h)} m · 來源：${HSRC[L.src].t}<br>原始標籤：${raw}`;
   $('#bhIn').value = L.h.toFixed(1);
   $('#bhClear').hidden = L.src !== 'user';
+  $('#bhClear').title = '改回 OSM／預設高度';
   st.bEdit = i; $('#bsheet').hidden = false;
 }
 $('#bhClose').onclick = () => { $('#bsheet').hidden = true; st.bEdit = null; };
