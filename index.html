@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>CBRS 站點多徑射線</title>
 <script src="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Cesium.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Widgets/widgets.css">
@@ -42,7 +42,7 @@ html,body{overflow-x:hidden}
 #bsheet .rw input{width:5.5em;flex:none}
 #bsheet .rw .u{color:var(--muted);font-size:13px}
 #bsheet .rw button{white-space:nowrap}
-@media (max-width:900px){select,input[type=text],input[type=password],input[type=number]{font-size:16px}}
+
 .panel,.block,.row2>*,.tools>*{min-width:0}
 #status,#lbNote{overflow-wrap:anywhere}
 #map{position:relative;min-height:360px}
@@ -53,7 +53,9 @@ h1{margin:0;font-size:18px}
 .block h2{margin:0 0 8px;font-size:12px;letter-spacing:.08em;color:var(--muted)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
 label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
-select,input[type=text],input[type=password],input[type=number]{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:13px var(--mono);width:100%}
+select,input[type=text],input[type=password],input[type=number]{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:13px var(--mono);width:100%;max-width:100%}
+@media (max-width:900px){select,input[type=text],input[type=password],input[type=number]{font-size:16px}}
+.panel{overflow-x:hidden}
 input[type=checkbox]{accent-color:var(--accent)}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .seg{display:flex;flex-wrap:wrap;gap:4px}
@@ -107,7 +109,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 <body>
 <div id="toast" hidden></div>
 <div id="bsheet" hidden role="dialog" aria-label="建築高度">
-  <div class="hd"><b id="bhTitle"></b><button type="button" id="bhClose">關閉</button></div>
+  <div class="hd"><b id="bhTitle"></b><button type="button" id="bhClose" aria-label="關閉">✕ 關閉</button></div>
   <p id="bhInfo"></p>
   <div class="rw">
     <input type="number" id="bhIn" step="0.5" min="1" inputmode="decimal" aria-label="建築高度（公尺）"><span class="u">m</span>
@@ -120,7 +122,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:40</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:45</p>
     </div>
 
     <section class="block">
@@ -780,8 +782,7 @@ function drawBuildings() {
 }
 function openBSheet(i) {
   const b = st.osm[i], L = st.list[i];
-  $('#bhTitle').textContent = (b.name ? b.name + '　' : '') + (i === bsBuilding ? '（BS 所在建築）' : '');
-  if (!$('#bhTitle').textContent) $('#bhTitle').textContent = '建築';
+  $('#bhTitle').textContent = (i === bsBuilding ? 'BS 所在建築' : '建築') + (b.name ? '：' + b.name : '');
   const raw = [b.tagH && 'height=' + b.tagH, b.levels && 'building:levels=' + b.levels].filter(Boolean).join('，') || '沒有高度相關標籤';
   $('#bhInfo').innerHTML = `OSM ${b.id}<br>目前 ${fmt(L.h)} m · 來源：${HSRC[L.src].t}<br>原始標籤：${raw}`;
   $('#bhIn').value = L.h.toFixed(1);
@@ -1328,6 +1329,7 @@ async function createViewer(mode, key) {
     if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); return; }
     if (p && p.id && p.id.mIndex != null) { st.sel = 'm' + p.id.mIndex; st.picking = null; refresh(false); return; }
     if (p && p.id && p.id.bIndex != null && st.list) openBSheet(p.id.bIndex);
+    else { $('#bsheet').hidden = true; st.bEdit = null; }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   initFrames();
   ['mstatus', 'mlegend'].forEach(id => viewer.container.appendChild(document.getElementById(id)));
