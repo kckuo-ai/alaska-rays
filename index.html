@@ -147,7 +147,8 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <h2>參數</h2>
       <div class="row2">
         <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
-        <label class="f">RU 輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
+        <label class="f">RU 每埠輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
+        <label class="f">發射埠數（共用 SAS 上限）<input type="number" id="nPort" value="1" min="1" step="1"></label>
         <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17" step="0.5"></label>
         <label class="f">饋線與接頭損耗 (dB)<input type="number" id="cableL" value="1" step="0.5"></label>
         <label class="f">SAS 授權 maxEirp (dBm/MHz)<input type="number" id="sasE" value="37" step="1"></label>
@@ -296,7 +297,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <ul class="notes">
         <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
         <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
-        <li>EIRP 取「RU 輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
+        <li>RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
         <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
@@ -477,7 +478,8 @@ const NRB = { 30: { 10: 24, 20: 51, 40: 106 }, 15: { 10: 52, 20: 106, 40: 216 } 
 function lbCfg() {
   const bw = +$('#bw').value, scs = +$('#scs').value, nrb = NRB[scs][bw], nre = 12 * nrb, nf = +$('#nf').value || 0;
   const dev = (+$('#ruP').value || 0) - (+$('#cableL').value || 0) + (+$('#antG').value || 0);
-  const sasVal = $('#sasE').value === '' ? Infinity : +$('#sasE').value, sas = sasVal + 10 * Math.log10(bw);
+  const nPort = Math.max(1, Math.round(+$('#nPort').value || 1));
+  const sasVal = $('#sasE').value === '' ? Infinity : +$('#sasE').value, sas = sasVal + 10 * Math.log10(bw) - 10 * Math.log10(nPort);
   const eirpCap = Math.min(dev, sas), extra = +$('#extraL').value || 0, eirpTot = eirpCap - extra;
   const noise = -174 + 10 * Math.log10(nre * scs * 1e3) + nf;
   return { bw, scs, nrb, nre, nf, dev, sas, eirpCap, extra, eirpTot, eirpRE: eirpTot - 10 * Math.log10(nre), noise, sasLimited: sas < dev };
@@ -495,7 +497,7 @@ function syncLbNote() {
   const c = lbCfg();
   const ss = $('#ssPwr').value === '' ? null : +$('#ssPwr').value;
   const ssTxt = ss == null ? '' : `SIB1 宣告 SSB 每子載波 ${fmt(ss)} dBm，加天線增益後約 ${fmt(ss + (+$('#antG').value || 0) - (+$('#cableL').value || 0))} dBm（模型目前用 ${fmt(c.eirpRE + c.extra)} dBm）。`;
-  $('#lbNote').textContent = `設備能力 ${fmt(c.dev)} dBm，SAS 上限 ${Number.isFinite(c.sas) ? fmt(c.sas) : '—'} dBm（${c.bw} MHz），採用 ${fmt(c.eirpCap)} dBm${c.sasLimited ? '，受 SAS 限制' : ''}。` + ssTxt + `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。扣除額外損耗後總 EIRP ${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
+  $('#lbNote').textContent = `每埠：設備能力 ${fmt(c.dev)} dBm，SAS 上限 ${Number.isFinite(c.sas) ? fmt(c.sas) : '—'} dBm（${c.bw} MHz${+$('#nPort').value > 1 ? '，由 ' + $('#nPort').value + ' 個埠平分' : ''}），採用 ${fmt(c.eirpCap)} dBm${c.sasLimited ? '，受 SAS 限制' : ''}。` + ssTxt + `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。扣除額外損耗後總 EIRP ${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
 }
 const saveUEs = () => { try { localStorage.setItem('alaskaUEs', JSON.stringify(SITE.ues)); } catch (e) {} };
 const $ = s => document.querySelector(s);
@@ -1158,7 +1160,7 @@ $('#tbl').addEventListener('click', e => {
   const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
 });
 ['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
-['#ruP', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
+['#ruP', '#nPort', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
 $('#bsH').addEventListener('change', () => {
