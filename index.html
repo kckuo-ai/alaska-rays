@@ -17,7 +17,10 @@
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--body)}
 .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
-@media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:65vh auto;height:auto}}
+@media (max-width:900px){.app{grid-template-columns:minmax(0,1fr);grid-template-rows:65vh auto;height:auto}.panel{border-left:0;border-top:1px solid var(--line)}}
+html,body{overflow-x:hidden}
+.panel,.block,.row2>*,.tools>*{min-width:0}
+#status,#lbNote{overflow-wrap:anywhere}
 #map{position:relative;min-height:360px}
 .panel{overflow-y:auto;border-left:1px solid var(--line);padding:14px 16px 28px;display:flex;flex-direction:column;gap:12px}
 h1{margin:0;font-size:18px}
@@ -640,6 +643,19 @@ function antChanged() { syncAntUI(); if (!st.osm || !st.viewer || antRaf) return
 $('#secSel').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; st.secSel = b.dataset.s; antChanged(); });
 syncAntUI();
 syncLbNote();
+// Number fields recalc 0.5 s after typing stops, and only when the value actually changed
+const LIVE_SKIP = new Set(['ueLat', 'ueLon', 'key']);
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.type !== 'number' || LIVE_SKIP.has(el.id)) return;
+  if (el.value === '' || el.dataset.last === el.value) { e.stopImmediatePropagation(); e.stopPropagation(); return; }
+  el.dataset.last = el.value;
+}, true);
+document.querySelectorAll('.panel input[type=number]').forEach(el => {
+  if (LIVE_SKIP.has(el.id)) return;
+  let t;
+  el.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => el.dispatchEvent(new Event('change', { bubbles: true })), 500); });
+});
 
 function setUE(i, lat, lon) {
   SITE.ues[i] = { lat, lon }; delete st.cache[i]; saveUEs();
