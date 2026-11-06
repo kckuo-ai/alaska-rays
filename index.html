@@ -28,6 +28,11 @@ h1{margin:0;font-size:18px}
 label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
 select,input[type=text],input[type=password],input[type=number]{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:13px var(--mono);width:100%}
 input[type=checkbox]{accent-color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.lbl{font-size:12px;color:var(--muted)}
+.f output{color:var(--fg);font-family:var(--mono)}
+.sec{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
 .chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
 button{font:500 13px var(--body);background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
 button:hover{border-color:var(--accent)}
@@ -91,12 +96,20 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <h2>參數</h2>
       <div class="row2">
         <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
-        <label class="f">EIRP (dBm/10 MHz)<input type="number" id="eirp" value="47" step="1"></label>
+        <label class="f">最大 EIRP (dBm/10 MHz)<input type="number" id="eirp" value="47" step="1"></label>
         <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
         <label class="f">BS 所在建築高度 (m)<input type="number" id="bsH" step="0.5"></label>
         <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
         <label class="f">地面橢球高 h₀ (m)<input type="number" id="h0" step="0.5"></label>
+        <label class="f">通道頻寬
+          <select id="bw"><option value="10">10 MHz</option><option value="20">20 MHz</option><option value="40" selected>40 MHz</option></select>
+        </label>
+        <label class="f">子載波間距 (SCS)
+          <select id="scs"><option value="30" selected>30 kHz</option><option value="15">15 kHz</option></select>
+        </label>
+        <label class="f">UE 雜訊指數 NF (dB)<input type="number" id="nf" value="7" step="0.5"></label>
       </div>
+      <p class="sub" id="lbNote" style="margin-top:8px"></p>
       <div class="tools" style="margin-top:10px">
         <label class="chk"><input type="checkbox" id="showB" checked>顯示 OSM 建築體</label>
         <label class="chk"><input type="checkbox" id="ghost" checked>顯示被擋住的射線段</label>
@@ -105,8 +118,44 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
     </section>
 
     <section class="block">
+      <h2>基站天線</h2>
+      <label class="f">天線型式
+        <select id="antMode"><option value="sector">三扇區面板（間隔 120°）</option><option value="omni">全向</option></select>
+      </label>
+      <div id="secCtl" style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <label class="f">S1 方位角（正北順時針）<output id="azOut"></output><input type="range" id="az" min="0" max="359" step="1" value="0"></label>
+        <label class="f">機械下傾角 <output id="tiltOut"></output><input type="range" id="tilt" min="0" max="20" step="0.5" value="4"></label>
+        <div class="row2">
+          <label class="f">水平 3 dB 波束寬 (°)<input type="number" id="hpbw" value="65" step="5"></label>
+          <label class="f">垂直 3 dB 波束寬 (°)<input type="number" id="vpbw" value="10" step="1"></label>
+          <label class="f">面板離桅杆中心 (m)<input type="number" id="panelOff" value="0.5" step="0.1"></label>
+        </div>
+        <div>
+          <span class="lbl">地圖上顯示的扇區</span>
+          <div class="seg" id="secSel" style="margin-top:4px">
+            <button type="button" data-s="auto" aria-pressed="true">自動（最強）</button>
+            <button type="button" data-s="0" aria-pressed="false">S1</button>
+            <button type="button" data-s="1" aria-pressed="false">S2</button>
+            <button type="button" data-s="2" aria-pressed="false">S3</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
       <h2>UE（點地圖上的 UE 也可以切換）</h2>
       <div class="ues" id="ues"></div>
+      <div id="ueEdit" hidden style="margin-top:10px">
+        <div class="row2">
+          <label class="f">緯度<input type="number" id="ueLat" step="0.000001"></label>
+          <label class="f">經度<input type="number" id="ueLon" step="0.000001"></label>
+        </div>
+        <div class="tools" style="margin-top:8px">
+          <button type="button" id="uePick" aria-pressed="false">在地圖上點新位置</button>
+          <button type="button" id="ueApply">套用座標</button>
+          <button type="button" id="ueReset">還原原始位置</button>
+        </div>
+      </div>
     </section>
 
     <section class="block" id="sumBlock">
@@ -139,7 +188,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <ul class="notes">
         <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
         <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
-        <li>天線視為全向 0 dBi，UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
+        <li>扇區天線用 3GPP TR 38.901 的面板方向圖（水平、垂直各以 3 dB 波束寬決定，前後比 30 dB），EIRP 指主瓣方向；全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
         <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
@@ -230,10 +279,12 @@ const RT = (() => {
       for (const c of p.pen) pl += c.kind === 'roof' ? o.penR : o.penW;
       p.pl = pl;
     }
-    const best = Math.min(...paths.map(p => p.pl));
-    paths.forEach(p => p.rel = best - p.pl);
-    paths.sort((a, b) => b.rel - a.rel);
-    return { kept: paths.filter(p => p.rel >= -o.relCut), total: paths.length };
+    for (const p of paths) {
+      const a = p.pts[0], b = p.pts[1], dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+      p.az = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
+      p.el = Math.atan2(dy, Math.hypot(dx, dz)) * 180 / Math.PI;
+    }
+    return { paths, total: paths.length };
   }
   return { setBuildings, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
 })();
@@ -249,8 +300,31 @@ const SITE = {
   ].map(([lat, lon]) => ({ lat, lon }))
 };
 const UE_H = 1.5, REL_CUT = 40, TOP_ALL = 3;
+const ORIG_UES = SITE.ues.map(u => ({ ...u }));
+try { const sv = JSON.parse(localStorage.getItem('alaskaUEs') || 'null'); if (Array.isArray(sv) && sv.length === SITE.ues.length && sv.every(u => Number.isFinite(u.lat) && Number.isFinite(u.lon))) SITE.ues = sv; } catch (e) {}
+const NRB = { 30: { 10: 24, 20: 51, 40: 106 }, 15: { 10: 52, 20: 106, 40: 216 } };
+function lbCfg() {
+  const bw = +$('#bw').value, scs = +$('#scs').value, nrb = NRB[scs][bw], nre = 12 * nrb, nf = +$('#nf').value || 0;
+  const eirpTot = (+$('#eirp').value || 0) + 10 * Math.log10(bw / 10);
+  const noise = -174 + 10 * Math.log10(nre * scs * 1e3) + nf;
+  return { bw, scs, nrb, nre, nf, eirpTot, eirpRE: eirpTot - 10 * Math.log10(nre), noise };
+}
+const eirpTot = () => lbCfg().eirpTot;
+function link(r) {
+  const c = lbCfg(), S = r.prx[r.sector];
+  if (!Number.isFinite(S)) return null;
+  const I = r.prx.reduce((s, v, k) => (k === r.sector || !Number.isFinite(v)) ? s : s + Math.pow(10, v / 10), 0);
+  return { S, rsrp: S - 10 * Math.log10(c.nre), snr: S - c.noise, sinr: S - 10 * Math.log10(I + Math.pow(10, c.noise / 10)), hasI: !r.omni };
+}
+const RSRP_LV = [[-80, '很好', '#3ddc84'], [-90, '好', '#a8e05f'], [-100, '普通', '#ffd23f'], [-110, '弱', '#ff9f43'], [-Infinity, '很差', '#ff5e5e']];
+const rsrpLv = v => RSRP_LV.find(x => v >= x[0]);
+function syncLbNote() {
+  const c = lbCfg();
+  $('#lbNote').textContent = `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。總 EIRP ${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
+}
+const saveUEs = () => { try { localStorage.setItem('alaskaUEs', JSON.stringify(SITE.ues)); } catch (e) {} };
 const $ = s => document.querySelector(s);
-const st = { h0: null, osm: null, sel: 0, cache: {}, viewer: null, tileset: null, hi: null };
+const st = { h0: null, osm: null, sel: 0, cache: {}, viewer: null, tileset: null, hi: null, secSel: 'auto', picking: null, bKey: '' };
 let Mgeo, MgeoInv, Mdisp;
 
 function status(msg, err) { const s = $('#status'); s.textContent = msg; s.classList.toggle('err', !!err); }
@@ -271,7 +345,7 @@ function toLLH(p) { const c = Cesium.Cartographic.fromCartesian(toWorld(p)); ret
 
 /* ===== OSM buildings ===== */
 function centerAndRadius() {
-  const pts = [SITE.bs, ...SITE.ues];
+  const pts = [SITE.bs, ...ORIG_UES];
   const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length, lon = pts.reduce((s, p) => s + p.lon, 0) / pts.length;
   const mPerLat = 111320, mPerLon = 111320 * Math.cos(lat * Math.PI / 180);
   const r = Math.max(...pts.map(p => Math.hypot((p.lat - lat) * mPerLat, (p.lon - lon) * mPerLon)));
@@ -333,13 +407,40 @@ function uePos(i) { const [x, z] = toLocal(SITE.ues[i].lon, SITE.ues[i].lat); re
 function opts() {
   return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, relCut: REL_CUT };
 }
-function traceUE(i) {
+function geomUE(i) {
   if (!st.cache[i]) {
     const rx = uePos(i), r = RT.trace(txPos(), rx, opts());
-    const ib = RT.buildingAt(rx[0], rx[2]);
-    st.cache[i] = { ...r, indoor: ib >= 0 };
+    st.cache[i] = { ...r, indoor: RT.buildingAt(rx[0], rx[2]) >= 0 };
   }
   return st.cache[i];
+}
+const wrap180 = a => ((a + 180) % 360 + 360) % 360 - 180;
+function antCfg() {
+  return { mode: $('#antMode').value, az: +$('#az').value || 0, tilt: +$('#tilt').value || 0,
+    hp: Math.max(5, +$('#hpbw').value || 65), vp: Math.max(2, +$('#vpbw').value || 10), off: +$('#panelOff').value || 0 };
+}
+const sectorAz = (a, k) => ((a.az + 120 * k) % 360 + 360) % 360;
+function patt(a, k, p) {
+  if (a.mode === 'omni') return 0;
+  const AH = -Math.min(12 * (wrap180(p.az - sectorAz(a, k)) / a.hp) ** 2, 30);
+  const AV = -Math.min(12 * ((-p.el - a.tilt) / a.vp) ** 2, 30);
+  return -Math.min(-(AH + AV), 30);
+}
+function traceUE(i) {
+  const g = geomUE(i), a = antCfg(), eirp = eirpTot(), K = a.mode === 'omni' ? 1 : 3, per = [];
+  for (let k = 0; k < K; k++) {
+    const ps = g.paths.map(p => { const gain = patt(a, k, p); return Object.assign({}, p, { gain, pl: p.pl - gain }); });
+    per.push({ ps, prx: ps.length ? 10 * Math.log10(ps.reduce((s, p) => s + Math.pow(10, (eirp - p.pl) / 10), 0)) : -Infinity });
+  }
+  let serve = 0; per.forEach((x, k) => { if (x.prx > per[serve].prx) serve = k; });
+  const k = (K === 1 || st.secSel === 'auto' || st.sel === 'all') ? serve : +st.secSel;
+  const ps = per[k].ps, out = { indoor: g.indoor, sector: k, serve, prx: per.map(x => x.prx), omni: K === 1, total: ps.length, kept: [] };
+  if (!ps.length) return out;
+  const best = Math.min(...ps.map(p => p.pl));
+  ps.forEach(p => p.rel = best - p.pl);
+  ps.sort((x, y) => y.rel - x.rel);
+  out.kept = ps.filter(p => p.rel >= -REL_CUT);
+  return out;
 }
 function describe(p) {
   const base = { los: '直射', r1: '一次反射', r2: '二次反射' }[p.type];
@@ -356,7 +457,7 @@ function stats(kept) {
   const mean = kept.reduce((s, p, i) => s + lin[i] * p.tau, 0) / sp;
   const rms = Math.sqrt(kept.reduce((s, p, i) => s + lin[i] * (p.tau - mean) ** 2, 0) / sp);
   const best = kept[0];
-  const eirp = +$('#eirp').value || 0;
+  const eirp = eirpTot();
   const prxTot = 10 * Math.log10(kept.reduce((s, p) => s + Math.pow(10, (eirp - p.pl) / 10), 0));
   return { rms, best, prxTot, tmin: Math.min(...kept.map(p => p.tau)) };
 }
@@ -371,17 +472,33 @@ function drawSite() {
   siteDS.entities.removeAll();
   const tx = txPos();
   siteDS.entities.add({ polyline: { positions: [toWorld([0, tx[1] - (+$('#mast').value || 0), 0]), toWorld(tx)], width: 3, arcType: Cesium.ArcType.NONE, material: Cesium.Color.ORANGE } });
+  const a = antCfg();
+  if (a.mode !== 'omni') {
+    const serve = st.sel === 'all' ? null : traceUE(st.sel).sector, tl = a.tilt * Math.PI / 180, L = 70;
+    for (let k = 0; k < 3; k++) {
+      const az = sectorAz(a, k) * Math.PI / 180, p0 = panelPos(k);
+      const dir = (b, len) => [p0[0] + len * Math.cos(tl) * Math.sin(b), p0[1] - len * Math.sin(tl), p0[2] + len * Math.cos(tl) * Math.cos(b)];
+      const col = SEC_COL[k].withAlpha(serve == null || serve === k ? 1 : .35);
+      siteDS.entities.add({ polyline: { positions: [toWorld(p0), toWorld(dir(az, L))], width: 9, arcType: Cesium.ArcType.NONE, material: new Cesium.PolylineArrowMaterialProperty(col) } });
+      const h = a.hp / 2 * Math.PI / 180;
+      [az - h, az + h].forEach(b => siteDS.entities.add({ polyline: { positions: [toWorld(p0), toWorld(dir(b, L * .6))], width: 1.5, arcType: Cesium.ArcType.NONE, material: new Cesium.PolylineDashMaterialProperty({ color: col, dashLength: 8 }) } }));
+      siteDS.entities.add({ position: toWorld(dir(az, L + 8)), label: { text: 'S' + (k + 1) + ' ' + Math.round(sectorAz(a, k)) + '°', font: '600 12px sans-serif', fillColor: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+    }
+  }
   siteDS.entities.add({ position: toWorld(tx), point: { pixelSize: 13, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
     label: { text: 'BS', font: '600 13px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -18), fillColor: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
   SITE.ues.forEach((u, i) => {
-    const on = st.sel === i || st.sel === 'all';
+    const on = st.sel === i || st.sel === 'all', lk = link(traceUE(i)), lv = lk ? rsrpLv(lk.rsrp) : RSRP_LV[4];
     const e = siteDS.entities.add({ position: toWorld(uePos(i)),
-      point: { pixelSize: on ? 12 : 8, color: Cesium.Color.fromCssColorString('#4fd1e0').withAlpha(on ? 1 : .6), outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-      label: { text: String(i + 1), font: '600 12px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+      point: { pixelSize: on ? 14 : 10, color: Cesium.Color.fromCssColorString(lv[2]).withAlpha(on ? 1 : .7), outlineColor: on ? Cesium.Color.WHITE : Cesium.Color.BLACK, outlineWidth: on ? 2 : 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: (i + 1) + (lk ? '  ' + fmt(lk.rsrp, 0) : ''), font: '600 12px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     e.ueIndex = i;
   });
 }
 function drawBuildings() {
+  const key = st.h0 + '|' + $('#showB').checked + '|' + bsBuilding + '|' + st.list.map(b => b.h).join(',');
+  if (key === st.bKey) return;
+  st.bKey = key;
   bldDS.entities.removeAll();
   if (!$('#showB').checked) return;
   st.osm.forEach((b, i) => {
@@ -394,14 +511,24 @@ function drawBuildings() {
       outline: true, outlineColor: st.tileset ? Cesium.Color.CYAN.withAlpha(.55) : Cesium.Color.fromCssColorString('#5f7184') } });
   });
 }
+const SEC_COL = ['#ffb347', '#7ee081', '#c792ea'].map(c => Cesium.Color.fromCssColorString(c));
+function panelPos(k) {
+  const a = antCfg(), t = txPos();
+  if (a.mode === 'omni') return t;
+  const az = sectorAz(a, k) * Math.PI / 180;
+  return [t[0] + a.off * Math.sin(az), t[1], t[2] + a.off * Math.cos(az)];
+}
 function drawRays() {
   raysDS.entities.removeAll(); drawn = [];
   const ghost = $('#ghost').checked;
-  const sets = st.sel === 'all' ? SITE.ues.map((_, i) => traceUE(i).kept.slice(0, TOP_ALL)) : [traceUE(st.sel).kept];
-  sets.forEach(kept => kept.forEach(p => {
-    const w = 1 + p.rel / REL_CUT, col = ramp(w);
+  const sets = st.sel === 'all'
+    ? SITE.ues.map((_, i) => { const r = traceUE(i); return { r, kept: r.kept.slice(0, TOP_ALL) }; })
+    : [(() => { const r = traceUE(st.sel); return { r, kept: r.kept }; })()];
+  sets.forEach(({ r, kept }) => kept.forEach(p => {
+    const w = 1 + p.rel / REL_CUT, col = ramp(w), pts = p.pts.slice();
+    pts[0] = panelPos(r.sector);
     const e = raysDS.entities.add({ polyline: {
-      positions: p.pts.map(toWorld), width: 2 + 4 * w, arcType: Cesium.ArcType.NONE,
+      positions: pts.map(toWorld), width: 2 + 4 * w, arcType: Cesium.ArcType.NONE,
       material: new Cesium.ColorMaterialProperty(col),
       depthFailMaterial: ghost ? new Cesium.PolylineDashMaterialProperty({ color: col.withAlpha(.6), dashLength: 10 }) : undefined } });
     const marks = p.pen.map(c => raysDS.entities.add({ position: toWorld(c.p), point: { pixelSize: 6, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } }));
@@ -429,12 +556,18 @@ function renderPanel() {
   if (st.sel === 'all') {
     $('#sumTitle').textContent = '全部 UE 摘要';
     $('#pdpBlock').hidden = true;
-    $('#stats').innerHTML = `<div><dt>BS 天線離地</dt><dd>${fmt(tx[1])}<small>m</small></dd></div><div><dt>地圖上每個 UE 顯示</dt><dd>${TOP_ALL}<small>條最強路徑</small></dd></div>`;
+    const c = lbCfg();
+    $('#stats').innerHTML = `<div><dt>BS 天線離地</dt><dd>${fmt(tx[1])}<small>m</small></dd></div><div><dt>地圖上每個 UE 顯示</dt><dd>${TOP_ALL}<small>條最強路徑</small></dd></div>` +
+      `<div><dt>通道</dt><dd>${c.bw}<small>MHz · ${c.nrb} RB</small></dd></div><div><dt>總 EIRP</dt><dd>${fmt(c.eirpTot)}<small>dBm</small></dd></div>` +
+      `<div style="grid-column:1/-1"><dt>RSRP 分級（dBm）</dt><dd style="font:12px var(--body)">${RSRP_LV.map((x, k) => `<span class="sec" style="background:${x[2]}"></span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)}`).join('　')}</dd></div>`;
     $('#tblTitle').textContent = '各 UE';
-    $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>最強路徑</th><th>接收</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
+    $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>RSRP</th><th>SINR</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
       const r = traceUE(i), s = stats(r.kept), d = Math.hypot(...uePos(i).map((v, k) => v - tx[k]));
+      const secTag = r.omni ? '' : `<small><span class="sec" style="background:${SEC_COL[r.sector].toCssHexString()}"></span>S${r.sector + 1}</small>`;
       if (!s) return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit" colspan="3">無有效路徑（穿越超過 4 面）</td></tr>`;
-      return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit">${describe(s.best).label}</td><td>${fmt(s.prxTot)} dBm</td><td>${fmt(s.rms)} ns</td></tr>`;
+      const lk = link(r), lv = rsrpLv(lk.rsrp);
+      return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}${secTag}</td><td>${fmt(d, 0)} m<small style="font-family:var(--body)">${describe(s.best).label}</small></td>` +
+        `<td><span class="sec" style="background:${lv[2]}"></span>${fmt(lk.rsrp)}<small>dBm · ${lv[1]}</small></td><td>${fmt(lk.hasI ? lk.sinr : lk.snr)}<small>dB</small></td><td>${fmt(s.rms)} ns</td></tr>`;
     }).join('');
     return;
   }
@@ -451,16 +584,22 @@ function renderPanel() {
   $('#stats').innerHTML =
     `<div><dt>BS 到 UE 直線距離</dt><dd>${fmt(d)}<small>m</small></dd></div>` +
     `<div><dt>UE 位置</dt><dd style="font-family:inherit;font-size:15px">${r.indoor ? '室內（OSM 建築內）' : '室外'}</dd></div>` +
+    (r.omni ? '' : `<div><dt>服務扇區（最強）</dt><dd><span class="sec" style="background:${SEC_COL[r.serve].toCssHexString()}"></span>S${r.serve + 1}${r.sector !== r.serve ? `<small>目前顯示 S${r.sector + 1}</small>` : ''}</dd></div>` +
+      `<div><dt>各扇區接收 (dBm)</dt><dd style="font-size:12px">${r.prx.map((v, k) => `S${k + 1} ${Number.isFinite(v) ? fmt(v) : '—'}`).join('<br>')}</dd></div>`) +
     `<div><dt>最強路徑</dt><dd style="font-family:inherit;font-size:15px">${describe(s.best).label}</dd></div>` +
     `<div><dt>最強路徑損耗</dt><dd>${fmt(s.best.pl)}<small>dB</small></dd></div>` +
-    `<div><dt>總接收功率</dt><dd>${fmt(s.prxTot)}<small>dBm/10 MHz</small></dd></div>` +
+    (() => { const lk = link(r), lv = rsrpLv(lk.rsrp), c = lbCfg();
+      return `<div><dt>RSRP（每個子載波）</dt><dd><span class="sec" style="background:${lv[2]}"></span>${fmt(lk.rsrp)}<small>dBm · ${lv[1]}</small></dd></div>` +
+        `<div><dt>${c.bw} MHz 總接收功率</dt><dd>${fmt(lk.S)}<small>dBm</small></dd></div>` +
+        `<div><dt>SNR</dt><dd>${fmt(lk.snr)}<small>dB</small></dd></div>` +
+        (lk.hasI ? `<div><dt>SINR（另兩扇區同頻干擾）</dt><dd>${fmt(lk.sinr)}<small>dB</small></dd></div>` : ''); })() +
     `<div><dt>RMS 時延擴展</dt><dd>${fmt(s.rms)}<small>ns</small></dd></div>`;
   $('#tblTitle').textContent = `路徑（顯示 ${kept.length} 條，共找到 ${r.total} 條）`;
-  const eirp = +$('#eirp').value || 0;
-  $('#tbl').innerHTML = '<tr><th>路徑</th><th>長度</th><th>附加時延</th><th>損耗</th><th>相對</th></tr>' + kept.map((p, i) => {
+  const eirp = eirpTot();
+  $('#tbl').innerHTML = '<tr><th>路徑</th><th>長度</th><th>附加時延</th><th>損耗（含天線）</th><th>相對</th></tr>' + kept.map((p, i) => {
     const ds = describe(p);
     return `<tr class="p" data-i="${i}"><td><span class="sw" style="background:${drawn[i] ? drawn[i].col.toCssHexString() : '#888'}"></span>${ds.label}<small>${ds.detail}</small></td>` +
-      `<td>${fmt(p.d)} m</td><td>${fmt(p.tau - s.tmin)} ns</td><td>${fmt(p.pl)} dB<small>${fmt(eirp - p.pl)} dBm</small></td><td>${fmt(p.rel)} dB</td></tr>`;
+      `<td>${fmt(p.d)} m</td><td>${fmt(p.tau - s.tmin)} ns</td><td>${fmt(p.pl)} dB<small>${fmt(eirp - p.pl)} dBm</small>${r.omni ? '' : `<small>天線 ${fmt(p.gain)} dB</small>`}</td><td>${fmt(p.rel)} dB</td></tr>`;
   }).join('');
   // PDP
   const W = 360, H = 150, L = 34, R = 10, T = 10, Bm = 28, pw = W - L - R, ph = H - T - Bm;
@@ -479,11 +618,58 @@ function refresh(rebuild) {
   if (!st.osm) return;
   if (rebuild) buildModel();
   setDispFrame();
-  drawSite(); drawBuildings(); drawRays(); renderUEButtons(); renderPanel(); highlight(null);
+  drawSite(); drawBuildings(); drawRays(); renderUEButtons(); renderPanel(); syncUEEdit(); st.hi = null; highlight(null);
 }
+function syncAntUI() {
+  const a = antCfg();
+  $('#secCtl').hidden = a.mode === 'omni';
+  $('#azOut').textContent = ` ${[0, 1, 2].map(k => 'S' + (k + 1) + ' ' + Math.round(sectorAz(a, k)) + '°').join(' · ')}`;
+  $('#tiltOut').textContent = ` ${a.tilt}°`;
+  document.querySelectorAll('#secSel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === st.secSel));
+}
+function syncUEEdit() {
+  const single = st.sel !== 'all';
+  $('#ueEdit').hidden = !single;
+  if (single) { $('#ueLat').value = SITE.ues[st.sel].lat.toFixed(7); $('#ueLon').value = SITE.ues[st.sel].lon.toFixed(7); }
+  $('#uePick').setAttribute('aria-pressed', st.picking != null);
+}
+let antRaf = 0;
+function antChanged() { syncAntUI(); if (!st.osm || !st.viewer || antRaf) return; antRaf = requestAnimationFrame(() => { antRaf = 0; refresh(false); }); }
+['#az', '#tilt'].forEach(sel => $(sel).addEventListener('input', antChanged));
+['#antMode', '#hpbw', '#vpbw', '#panelOff'].forEach(sel => $(sel).addEventListener('change', antChanged));
+$('#secSel').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (!b) return; st.secSel = b.dataset.s; antChanged(); });
+syncAntUI();
+syncLbNote();
+
+function setUE(i, lat, lon) {
+  SITE.ues[i] = { lat, lon }; delete st.cache[i]; saveUEs();
+  const c = centerAndRadius(), m = Math.hypot((lat - c.lat) * 111320, (lon - c.lon) * 111320 * Math.cos(c.lat * Math.PI / 180));
+  status(`UE ${i + 1} 移到 ${lat.toFixed(6)}, ${lon.toFixed(6)}。` + (m > c.r - 50 ? '\n注意：這個位置超出已載入的建築範圍，附近建築不會參與計算。' : ''), m > c.r - 50);
+  refresh(false);
+}
+function pickUE(pos) {
+  const v = st.viewer; let c;
+  try { c = v.scene.pickPosition(pos); } catch (e) {}
+  if (!c) c = v.camera.pickEllipsoid(pos);
+  if (!c) { status('這個位置抓不到地面，請再點一次。', true); return; }
+  const g = Cesium.Cartographic.fromCartesian(c), i = st.picking;
+  st.picking = null;
+  setUE(i, Cesium.Math.toDegrees(g.latitude), Cesium.Math.toDegrees(g.longitude));
+}
+$('#uePick').onclick = () => {
+  if (!st.viewer || !st.osm || st.sel === 'all') return;
+  st.picking = st.picking == null ? st.sel : null; syncUEEdit();
+  if (st.picking != null) status(`點地圖選 UE ${st.sel + 1} 的新位置。`);
+};
+$('#ueApply').onclick = () => {
+  const lat = +$('#ueLat').value, lon = +$('#ueLon').value;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { status('緯度或經度格式不對。', true); return; }
+  if (st.osm && st.viewer && st.sel !== 'all') setUE(st.sel, lat, lon);
+};
+$('#ueReset').onclick = () => { if (st.osm && st.viewer && st.sel !== 'all') setUE(st.sel, ORIG_UES[st.sel].lat, ORIG_UES[st.sel].lon); };
 
 /* ===== events ===== */
-$('#ues').addEventListener('click', e => { const b = e.target.closest('[data-u]'); if (!b || !st.osm) return; st.sel = b.dataset.u === 'all' ? 'all' : +b.dataset.u; refresh(false); });
+$('#ues').addEventListener('click', e => { const b = e.target.closest('[data-u]'); if (!b || !st.osm) return; st.sel = b.dataset.u === 'all' ? 'all' : +b.dataset.u; st.picking = null; refresh(false); });
 $('#tbl').addEventListener('pointerover', e => { const tr = e.target.closest('tr.p[data-i]'); if (tr && st.hi == null) highlight(+tr.dataset.i); });
 $('#tbl').addEventListener('pointerleave', () => { if (st.hi == null) highlight(null); });
 $('#tbl').addEventListener('click', e => {
@@ -491,12 +677,13 @@ $('#tbl').addEventListener('click', e => {
   if (tr.dataset.u != null) { st.sel = +tr.dataset.u; refresh(false); return; }
   const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
 });
-['#fMHz', '#eirp', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
+['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
+['#eirp', '#bw', '#scs', '#nf'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
 $('#bsH').addEventListener('change', () => { bsOverride = +$('#bsH').value; refresh(true); });
 $('#h0').addEventListener('change', () => { st.h0 = +$('#h0').value; refresh(false); });
-$('#showB').addEventListener('change', () => drawBuildings());
+$('#showB').addEventListener('change', () => { if (st.osm) drawBuildings(); });
 $('#ghost').addEventListener('change', () => { drawRays(); highlight(null); });
 
 function download(name, obj) {
@@ -507,10 +694,14 @@ function download(name, obj) {
 $('#dlB').onclick = () => { if (st.osm) download('buildings_osm.json', { attribution: '© OpenStreetMap contributors', buildings: st.osm }); };
 $('#dlR').onclick = () => {
   if (!st.osm) return;
-  const out = { frequency_MHz: +$('#fMHz').value, eirp_dBm: +$('#eirp').value, h0_ellipsoid_m: st.h0,
-    bs: { lat: SITE.bs.lat, lon: SITE.bs.lon, antenna_agl_m: txPos()[1] }, ues: SITE.ues.map((u, i) => {
+  const lc = lbCfg();
+  const out = { frequency_MHz: +$('#fMHz').value, bandwidth_MHz: lc.bw, scs_kHz: lc.scs, n_rb: lc.nrb, eirp_dBm_per_10MHz: +$('#eirp').value, eirp_total_dBm: +lc.eirpTot.toFixed(2), noise_dBm: +lc.noise.toFixed(2), h0_ellipsoid_m: st.h0,
+    bs: { lat: SITE.bs.lat, lon: SITE.bs.lon, antenna_agl_m: txPos()[1], antenna: antCfg() }, ues: SITE.ues.map((u, i) => {
       const r = traceUE(i);
-      return { id: i + 1, lat: u.lat, lon: u.lon, indoor: r.indoor, paths: r.kept.map(p => ({ type: describe(p).label, length_m: +p.d.toFixed(2), delay_ns: +p.tau.toFixed(2), pathloss_dB: +p.pl.toFixed(2), relative_dB: +p.rel.toFixed(2), vertices_lon_lat_h: p.pts.map(toLLH) })) };
+      const lk = link(r);
+      return { id: i + 1, lat: u.lat, lon: u.lon, indoor: r.indoor, serving_sector: r.omni ? null : r.sector + 1,
+        prx_dBm_per_sector: r.prx.map(v => Number.isFinite(v) ? +v.toFixed(2) : null),
+        rsrp_dBm: lk ? +lk.rsrp.toFixed(2) : null, snr_dB: lk ? +lk.snr.toFixed(2) : null, sinr_dB: lk && lk.hasI ? +lk.sinr.toFixed(2) : null, paths: r.kept.map(p => ({ type: describe(p).label, length_m: +p.d.toFixed(2), delay_ns: +p.tau.toFixed(2), pathloss_dB: +p.pl.toFixed(2), relative_dB: +p.rel.toFixed(2), antenna_gain_rel_dB: +(p.gain || 0).toFixed(2), vertices_lon_lat_h: p.pts.map(toLLH) })) };
     }) };
   download('rays.json', out);
 };
@@ -542,7 +733,7 @@ renderUEButtons();
 function resetViewer() {
   if (st.viewer) { st.viewer.destroy(); st.viewer = null; st.tileset = null; }
   document.getElementById('map').innerHTML = '';
-  st.h0 = null;
+  st.h0 = null; st.bKey = '';
 }
 async function createViewer(mode, key) {
   const base = { baseLayerPicker: false, geocoder: false, timeline: false, animation: false, sceneModePicker: false, homeButton: false,
@@ -566,6 +757,7 @@ async function createViewer(mode, key) {
   raysDS = new Cesium.CustomDataSource('rays'); bldDS = new Cesium.CustomDataSource('osm'); siteDS = new Cesium.CustomDataSource('site');
   [bldDS, raysDS, siteDS].forEach(d => viewer.dataSources.add(d));
   new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction(m => {
+    if (st.picking != null) { pickUE(m.position); return; }
     const p = viewer.scene.pick(m.position); if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   initFrames();
