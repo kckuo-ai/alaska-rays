@@ -24,6 +24,15 @@ html,body{overflow-x:hidden}
 .mlegend{position:absolute;left:8px;top:8px;z-index:5;background:rgba(16,21,27,.85);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:11px/1.3 var(--mono);color:var(--muted);pointer-events:none}
 .mlegend .bar{width:140px;height:8px;border-radius:2px;margin:4px 0 2px;background:linear-gradient(90deg,#5b6cff,#e0479e,#ffcc4d)}
 .mlegend .ends{display:flex;justify-content:space-between}
+.mlegend .bl{display:grid;grid-template-columns:10px auto;gap:2px 6px;align-items:center;margin-top:6px}
+.mlegend .bl i{width:10px;height:10px;border-radius:2px;display:block}
+#bsheet{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:60;width:min(94vw,460px);
+  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+#bsheet .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#bsheet .hd b{font-size:14px;overflow-wrap:anywhere}
+#bsheet p{margin:6px 0 10px;color:var(--muted);font-size:12px}
+#bsheet .rw{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+#bsheet .rw label{flex:1 1 120px}
 .panel,.block,.row2>*,.tools>*{min-width:0}
 #status,#lbNote{overflow-wrap:anywhere}
 #map{position:relative;min-height:360px}
@@ -73,6 +82,15 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 </head>
 <body>
 <div id="toast" hidden></div>
+<div id="bsheet" hidden role="dialog" aria-label="建築高度">
+  <div class="hd"><b id="bhTitle"></b><button type="button" id="bhClose">關閉</button></div>
+  <p id="bhInfo"></p>
+  <div class="rw">
+    <label class="f">建築高度 (m)<input type="number" id="bhIn" step="0.5" min="1"></label>
+    <button type="button" class="primary" id="bhSave">套用</button>
+    <button type="button" id="bhClear">改回 OSM／預設</button>
+  </div>
+</div>
 <div class="app">
   <div id="map"></div>
   <aside class="panel">
@@ -389,23 +407,27 @@ function parseOSM(json) {
       if (m.role === 'outer' && m.geometry && m.geometry.length > 3) { const g = m.geometry; if (g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon) rings.push(g); }
     });
     const hh = heightOf(tags);
-    rings.forEach(g => out.push({ id: el.type + '/' + el.id, name: tags.name || '', h: hh.h, src: hh.src, ll: g.map(p => [p.lon, p.lat]) }));
+    rings.forEach(g => out.push({ id: el.type + '/' + el.id, name: tags.name || '', h: hh.h, src: hh.src, tagH: tags.height || '', levels: tags['building:levels'] || '', ll: g.map(p => [p.lon, p.lat]) }));
   }
   return out;
 }
 
 /* ===== model setup ===== */
-let bsBuilding = -1, bsOverride = null;
+let bsBuilding = -1;
+st.hOv = (() => { try { return JSON.parse(localStorage.getItem('alaskaBH') || '{}') || {}; } catch (e) { return {}; } })();
+const saveOv = () => { try { localStorage.setItem('alaskaBH', JSON.stringify(st.hOv)); } catch (e) {} };
 function buildModel() {
   const defH = +$('#defH').value || 9;
   const { r } = centerAndRadius();
-  const list = st.osm.map(b => ({ h: b.h ?? defH, poly: b.ll.map(([lon, lat]) => toLocal(lon, lat)) }));
+  const list = st.osm.map(b => {
+    const ov = st.hOv[b.id];
+    return { h: ov != null ? ov : (b.h ?? defH), src: ov != null ? 'user' : b.src, poly: b.ll.map(([lon, lat]) => toLocal(lon, lat)) };
+  });
   RT.setBuildings(list, r + 300);
   const bi = RT.buildingAt(0, 0);
   bsBuilding = bi >= 0 ? RT.building(bi).src : -1;
-  if (bsBuilding >= 0 && bsOverride != null) { list[bsBuilding].h = bsOverride; RT.setBuildings(list, r + 300); }
   st.list = list;
-  if (bsBuilding >= 0 && bsOverride == null) $('#bsH').value = list[bsBuilding].h.toFixed(1);
+  if (bsBuilding >= 0) $('#bsH').value = list[bsBuilding].h.toFixed(1);
   st.cache = {};
 }
 function txPos() {
@@ -504,22 +526,48 @@ function drawSite() {
     e.ueIndex = i;
   });
 }
+const HSRC = {
+  height: { c: '#4fd1e0', t: 'OSM height 標籤' },
+  levels: { c: '#7ee081', t: 'OSM 樓層數 × 3.5 m' },
+  user: { c: '#c792ea', t: '你設定的高度' },
+  default: { c: '#8a96a3', t: '沒有資料，用預設值' }
+};
 function drawBuildings() {
-  const key = st.h0 + '|' + $('#showB').checked + '|' + bsBuilding + '|' + st.list.map(b => b.h).join(',');
+  const key = st.h0 + '|' + $('#showB').checked + '|' + bsBuilding + '|' + st.list.map(b => b.h + b.src).join(',');
   if (key === st.bKey) return;
   st.bKey = key;
   bldDS.entities.removeAll();
   if (!$('#showB').checked) return;
   st.osm.forEach((b, i) => {
-    const h = st.list[i].h;
-    bldDS.entities.add({ polygon: {
-      hierarchy: Cesium.Cartesian3.fromDegreesArray(b.ll.flat()), height: st.h0, extrudedHeight: st.h0 + h,
-      material: st.tileset
-        ? (i === bsBuilding ? Cesium.Color.ORANGE : Cesium.Color.CYAN).withAlpha(i === bsBuilding ? .3 : .16)
-        : Cesium.Color.fromCssColorString(i === bsBuilding ? '#e8c9a0' : '#d9dee4'),
-      outline: true, outlineColor: st.tileset ? Cesium.Color.CYAN.withAlpha(.55) : Cesium.Color.fromCssColorString('#5f7184') } });
+    const L = st.list[i], base = Cesium.Color.fromCssColorString(HSRC[L.src].c), isBS = i === bsBuilding;
+    const fill = st.tileset ? base.withAlpha(L.src === 'default' ? .12 : .3)
+      : Cesium.Color.lerp(Cesium.Color.fromCssColorString('#e6eaee'), base, L.src === 'default' ? .15 : .55, new Cesium.Color());
+    const e = bldDS.entities.add({ polygon: {
+      hierarchy: Cesium.Cartesian3.fromDegreesArray(b.ll.flat()), height: st.h0, extrudedHeight: st.h0 + L.h,
+      material: fill, outline: true,
+      outlineColor: isBS ? Cesium.Color.ORANGE : (st.tileset ? base.withAlpha(.8) : Cesium.Color.fromCssColorString('#4a5868')) } });
+    e.bIndex = i;
   });
 }
+function openBSheet(i) {
+  const b = st.osm[i], L = st.list[i];
+  $('#bhTitle').textContent = (b.name ? b.name + '　' : '') + (i === bsBuilding ? '（BS 所在建築）' : '');
+  if (!$('#bhTitle').textContent) $('#bhTitle').textContent = '建築';
+  const raw = [b.tagH && 'height=' + b.tagH, b.levels && 'building:levels=' + b.levels].filter(Boolean).join('，') || '沒有高度相關標籤';
+  $('#bhInfo').innerHTML = `OSM ${b.id}<br>目前 ${fmt(L.h)} m · 來源：${HSRC[L.src].t}<br>原始標籤：${raw}`;
+  $('#bhIn').value = L.h.toFixed(1);
+  $('#bhClear').hidden = L.src !== 'user';
+  st.bEdit = i; $('#bsheet').hidden = false;
+}
+$('#bhClose').onclick = () => { $('#bsheet').hidden = true; st.bEdit = null; };
+$('#bhSave').onclick = () => {
+  const v = +$('#bhIn').value; if (!(v > 0) || st.bEdit == null) return;
+  st.hOv[st.osm[st.bEdit].id] = v; saveOv(); $('#bsheet').hidden = true; refresh(true);
+};
+$('#bhClear').onclick = () => {
+  if (st.bEdit == null) return;
+  delete st.hOv[st.osm[st.bEdit].id]; saveOv(); $('#bsheet').hidden = true; refresh(true);
+};
 const RAY_MIN = -125, RAY_MAX = -70;
 const SEC_COL = ['#ffb347', '#7ee081', '#c792ea'].map(c => Cesium.Color.fromCssColorString(c));
 function panelPos(k) {
@@ -733,7 +781,11 @@ $('#tbl').addEventListener('click', e => {
 ['#eirp', '#bw', '#scs', '#nf'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
-$('#bsH').addEventListener('change', () => { bsOverride = +$('#bsH').value; refresh(true); });
+$('#bsH').addEventListener('change', () => {
+  const v = +$('#bsH').value;
+  if (!st.osm || bsBuilding < 0 || !(v > 0)) return;
+  st.hOv[st.osm[bsBuilding].id] = v; saveOv(); refresh(true);
+});
 $('#h0').addEventListener('change', () => { st.h0 = +$('#h0').value; refresh(false); });
 $('#showB').addEventListener('change', () => { if (st.osm) drawBuildings(); });
 $('#ghost').addEventListener('change', () => { drawRays(); highlight(null); });
@@ -743,7 +795,7 @@ function download(name, obj) {
   a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], { type: 'application/json' }));
   a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-$('#dlB').onclick = () => { if (st.osm) download('buildings_osm.json', { attribution: '© OpenStreetMap contributors', buildings: st.osm }); };
+$('#dlB').onclick = () => { if (st.osm) download('buildings_osm.json', { attribution: '© OpenStreetMap contributors', height_overrides_m: st.hOv, buildings: st.osm }); };
 $('#dlR').onclick = () => {
   if (!st.osm) return;
   const lc = lbCfg();
@@ -810,11 +862,14 @@ async function createViewer(mode, key) {
   [bldDS, raysDS, siteDS].forEach(d => viewer.dataSources.add(d));
   new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction(m => {
     if (st.picking != null) { pickUE(m.position); return; }
-    const p = viewer.scene.pick(m.position); if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); }
+    const p = viewer.scene.pick(m.position);
+    if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); return; }
+    if (p && p.id && p.id.bIndex != null && st.list) openBSheet(p.id.bIndex);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   initFrames();
   const lg = document.createElement('div'); lg.className = 'mlegend';
-  lg.innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>`;
+  lg.innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>` +
+    `<div style="margin-top:6px">建築高度來源（點建築可修改）</div><div class="bl">` + Object.values(HSRC).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>';
   document.getElementById('map').appendChild(lg);
   const c = centerAndRadius();
   viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 60), c.r),
@@ -850,7 +905,7 @@ $('#go').onclick = async () => {
     await new Promise(r => setTimeout(r, 30));
     const t0 = performance.now();
     refresh(true);
-    const noH = st.osm.filter(b => b.src === 'default').length;
+    const noH = st.list.filter(b => b.src === 'default').length;
     status(`完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
       (bsBuilding < 0 ? '\n注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。' : ''));
   } catch (e) {
