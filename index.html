@@ -120,7 +120,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:15</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 00:20</p>
     </div>
 
     <section class="block">
@@ -135,7 +135,8 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </label>
       <label class="f" style="margin-top:8px">建築資料
         <select id="bsrc">
-          <option value="kmz">網站內附建築輪廓（即時載入，建議）</option>
+          <option value="osmb">網站內附 OSM 建築（2026-11-06 匯出，1452 棟，建議）</option>
+          <option value="kmz">網站內附路測 KMZ 建築輪廓（861 棟，無標籤）</option>
           <option value="osm">即時向 OpenStreetMap 查詢（較慢，伺服器常忙碌）</option>
         </select>
       </label>
@@ -540,6 +541,17 @@ function centerAndRadius() {
   const r = Math.max(...pts.map(p => Math.hypot((p.lat - lat) * mPerLat, (p.lon - lon) * mPerLon)));
   return { lat, lon, r: Math.ceil(r + 200) };
 }
+async function loadBundledOSM() {
+  status('載入內附 OSM 建築…');
+  const res = await fetch('buildings_osm.json');
+  if (!res.ok) throw new Error('內附建築檔讀取失敗（' + res.status + '）');
+  const j = await res.json();
+  let n = 0;
+  for (const [k, v] of Object.entries(j.height_overrides_m || {})) if (st.hOv[k] == null) { st.hOv[k] = v; n++; }
+  if (n) saveOv();
+  st.osmNote = `建築為網站內附的 OSM 資料（2026-11-06 匯出）${n ? `，並套用其中 ${n} 筆你設定的高度` : ''}。`;
+  return { parsed: j.buildings };
+}
 async function loadBundled(note) {
   status('載入內附建築輪廓…');
   const res = await fetch('buildings_kmz.json');
@@ -576,7 +588,7 @@ async function fetchOSM() {
   }
   // fallbacks: an older cached download, then the building outlines bundled with the site
   if (cached && cached.data) { st.osmNote = 'OSM 伺服器暫時連不上，改用上次抓到的建築資料。'; return cached.data; }
-  try { return await loadBundled('OSM 伺服器暫時連不上，改用網站內附的建築輪廓（沒有高度資料，全部用預設高度）。'); } catch (e) {}
+  try { const r = await loadBundledOSM(); st.osmNote = 'OSM 伺服器暫時連不上，改用網站內附的 OSM 建築（2026-11-06 匯出）。'; return r; } catch (e) {}
   throw new Error('OpenStreetMap 連線失敗：' + (lastErr && lastErr.message || lastErr));
 }
 function heightOf(t) {
@@ -1302,7 +1314,7 @@ $('#go').onclick = async () => {
   try {
     if (st.viewer && st.mode !== mode) resetViewer();
     if (!st.viewer) { status('載入地圖…'); await createViewer(mode, key); }
-    const osmP = st.osm ? Promise.resolve(null) : ($('#bsrc').value === 'osm' ? fetchOSM() : loadBundled());
+    const osmP = st.osm ? Promise.resolve(null) : ($('#bsrc').value === 'osm' ? fetchOSM() : $('#bsrc').value === 'kmz' ? loadBundled() : loadBundledOSM());
     if (st.h0 == null) {
       if (st.tileset) {
         const samples = await st.viewer.scene.sampleHeightMostDetailed(SITE.ues.map(u => Cesium.Cartographic.fromDegrees(u.lon, u.lat)));
@@ -1313,7 +1325,7 @@ $('#go').onclick = async () => {
     $('#h0').value = st.h0.toFixed(1);
     if (!st.tileset) $('#showB').checked = true;
     const osm = await osmP;
-    if (osm) st.osm = parseOSM(osm);
+    if (osm) st.osm = osm.parsed || parseOSM(osm);
     if (!st.osm.length) throw new Error('這個範圍內 OSM 沒有建築資料');
     status('計算射線…');
     await new Promise(r => setTimeout(r, 30));
