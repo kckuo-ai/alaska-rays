@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CBRS 站點多徑射線</title>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Cesium.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Widgets/widgets.css">
+<style>
+/* Layout: photoreal 3D map on the left, channel panel on the right (stacks under the map on narrow screens) */
+:root{
+  --bg:#10151b; --panel:#171e26; --fg:#e4e9ee; --muted:#93a1af; --line:#2a3541; --accent:#ffb347; --ue:#4fd1e0; --bad:#ff7a7a;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--body)}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100%}
+@media (max-width:900px){.app{grid-template-columns:1fr;grid-template-rows:65vh auto;height:auto}}
+#map{position:relative;min-height:360px}
+.panel{overflow-y:auto;border-left:1px solid var(--line);padding:14px 16px 28px;display:flex;flex-direction:column;gap:12px}
+h1{margin:0;font-size:18px}
+.sub{margin:0;color:var(--muted);font-size:12px}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+.block h2{margin:0 0 8px;font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+select,input[type=text],input[type=password],input[type=number]{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:13px var(--mono);width:100%}
+input[type=checkbox]{accent-color:var(--accent)}
+.chk{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+button{font:500 13px var(--body);background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#1a1205;border-color:var(--accent)}
+button[aria-pressed=true]{background:var(--ue);color:#04262b;border-color:var(--ue)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.ues{display:flex;flex-wrap:wrap;gap:6px}
+.ues button{min-width:38px}
+#status{font-size:12px;color:var(--muted);white-space:pre-line}
+#status.err{color:var(--bad)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0}
+.stats dt{font-size:11px;color:var(--muted)}
+.stats dd{margin:0;font:500 16px var(--mono);font-variant-numeric:tabular-nums}
+.stats dd small{font-size:11px;color:var(--muted);margin-left:2px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-weight:400;color:var(--muted);text-align:right;padding:4px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;font:12px var(--mono);font-variant-numeric:tabular-nums;vertical-align:top}
+td:first-child{font-family:var(--body)}
+td small{display:block;color:var(--muted);font-size:11px}
+tr.p{cursor:pointer}
+tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+#pdp{width:100%;height:auto;display:block}
+#pdp text{font:10px var(--mono);fill:var(--muted)}
+.notes{color:var(--muted);font-size:12px;margin:0;padding-left:18px}
+.tools{display:flex;flex-wrap:wrap;gap:6px}
+.cesium-viewer-bottom{left:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="map"></div>
+  <aside class="panel">
+    <div>
+      <h1>CBRS 站點多徑射線</h1>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。</p>
+    </div>
+
+    <section class="block">
+      <h2>啟動</h2>
+      <label class="f">背景
+        <select id="mode">
+          <option value="sat">衛星影像＋OSM 建築體（免金鑰）</option>
+          <option value="osm">OpenStreetMap 街道圖＋OSM 建築體（免金鑰）</option>
+          <option value="ion">Google 寫實 3D，經 Cesium ion（需 ion token）</option>
+          <option value="google">Google 寫實 3D，Map Tiles API（需 Google 金鑰）</option>
+        </select>
+      </label>
+      <label class="f" id="keyWrap" hidden style="margin-top:8px"><span id="keyLbl">金鑰</span>
+        <input type="password" id="key" autocomplete="off">
+      </label>
+      <div class="tools" style="margin-top:8px">
+        <button class="primary" id="go">載入地圖並計算</button>
+        <label class="chk" id="remWrap" hidden><input type="checkbox" id="remember" checked>在這台電腦記住金鑰</label>
+      </div>
+      <p id="status" style="margin:8px 0 0">選好背景後按「載入地圖並計算」。</p>
+    </section>
+
+    <section class="block">
+      <h2>參數</h2>
+      <div class="row2">
+        <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
+        <label class="f">EIRP (dBm/10 MHz)<input type="number" id="eirp" value="47" step="1"></label>
+        <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
+        <label class="f">BS 所在建築高度 (m)<input type="number" id="bsH" step="0.5"></label>
+        <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
+        <label class="f">地面橢球高 h₀ (m)<input type="number" id="h0" step="0.5"></label>
+      </div>
+      <div class="tools" style="margin-top:10px">
+        <label class="chk"><input type="checkbox" id="showB" checked>顯示 OSM 建築體</label>
+        <label class="chk"><input type="checkbox" id="ghost" checked>顯示被擋住的射線段</label>
+        <label class="chk"><input type="checkbox" id="order2" checked>計算二次反射</label>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>UE（點地圖上的 UE 也可以切換）</h2>
+      <div class="ues" id="ues"></div>
+    </section>
+
+    <section class="block" id="sumBlock">
+      <h2 id="sumTitle">通道摘要</h2>
+      <dl class="stats" id="stats"><div><dt>尚未計算</dt><dd>—</dd></div></dl>
+    </section>
+
+    <section class="block" id="pdpBlock">
+      <h2>功率時延剖面</h2>
+      <svg id="pdp" viewBox="0 0 360 150"></svg>
+    </section>
+
+    <section class="block">
+      <h2 id="tblTitle">路徑</h2>
+      <div style="overflow-x:auto"><table id="tbl"></table></div>
+    </section>
+
+    <section class="block">
+      <h2>資料</h2>
+      <div class="tools">
+        <button id="dlB">下載建築 JSON</button>
+        <button id="dlR">下載射線 JSON</button>
+        <label class="chk"><input type="file" id="upB" accept=".json" hidden><button type="button" id="upBtn">改用本機建築 JSON</button></label>
+      </div>
+      <p class="sub" style="margin-top:8px">射線 JSON 含每條路徑的經緯度、橢球高與損耗，之後可以換成 Sionna RT 的結果。</p>
+    </section>
+
+    <section class="block">
+      <h2>模型假設</h2>
+      <ul class="notes">
+        <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
+        <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
+        <li>天線視為全向 0 dBi，UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
+        <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
+      </ul>
+      <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
+    </section>
+  </aside>
+</div>
+
+<script>
+/* ===== Ray engine (local ENU: x = east, y = up, z = north, meters) ===== */
+const RT = (() => {
+  let B = [], F = [], GR = 700;
+  const area = p => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return a / 2; };
+  const pip = (poly, x, z) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) ins = !ins; } return ins; };
+  function setBuildings(list, groundR) {
+    GR = groundR; B = []; F = [];
+    list.forEach((src, si) => {
+      let poly = src.poly.slice();
+      if (poly.length > 3) { const f = poly[0], l = poly[poly.length - 1]; if (Math.abs(f[0] - l[0]) < 1e-6 && Math.abs(f[1] - l[1]) < 1e-6) poly.pop(); }
+      if (poly.length < 3 || Math.abs(area(poly)) < 4) return;
+      if (area(poly) < 0) poly.reverse();
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+      poly.forEach(([x, z]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); });
+      const b = { src: si, h: src.h, poly, x0, x1, z0, z1, faces: [] }, bi = B.length; B.push(b);
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], c = poly[(i + 1) % poly.length], dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
+        if (len < 0.3) continue;
+        const nx = dz / len, nz = -dx / len;
+        const f = { kind: 'wall', b: bi, ax: a[0], az: a[1], dx, dz, len2: len * len, nx, nz, c: nx * a[0] + nz * a[1], h: b.h };
+        F.push(f); b.faces.push(f);
+      }
+    });
+    F.push({ kind: 'ground' });
+  }
+  const sd = (f, p) => f.kind === 'ground' ? p[1] : f.nx * p[0] + f.nz * p[2] - f.c;
+  const side = (f, p) => sd(f, p) > 1e-6;
+  const mirror = (p, f) => { if (f.kind === 'ground') return [p[0], -p[1], p[2]]; const d = sd(f, p); return [p[0] - 2 * d * f.nx, p[1], p[2] - 2 * d * f.nz]; };
+  function cross(a, b, f) {
+    const da = sd(f, a), db = sd(f, b); if (da * db >= 0) return null;
+    const t = da / (da - db); if (t <= 1e-6 || t >= 1 - 1e-6) return null;
+    return { t, p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t] };
+  }
+  function buildingAt(x, z) { for (let i = 0; i < B.length; i++) { const b = B[i]; if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && pip(b.poly, x, z)) return i; } return -1; }
+  function inFace(f, p) {
+    if (f.kind === 'ground') return p[0] * p[0] + p[2] * p[2] <= GR * GR && buildingAt(p[0], p[2]) < 0;
+    if (p[1] <= 0 || p[1] >= f.h) return false;
+    const s = ((p[0] - f.ax) * f.dx + (p[2] - f.az) * f.dz) / f.len2;
+    return s > 1e-6 && s < 1 - 1e-6;
+  }
+  function crossings(a, b) {
+    const out = [];
+    const mnx = Math.min(a[0], b[0]), mxx = Math.max(a[0], b[0]), mnz = Math.min(a[2], b[2]), mxz = Math.max(a[2], b[2]), mny = Math.min(a[1], b[1]);
+    for (let i = 0; i < B.length; i++) {
+      const bl = B[i];
+      if (bl.x1 < mnx || bl.x0 > mxx || bl.z1 < mnz || bl.z0 > mxz || mny >= bl.h) continue;
+      for (const f of bl.faces) { const c = cross(a, b, f); if (c && inFace(f, c.p)) out.push({ b: i, kind: 'wall', t: c.t, p: c.p }); }
+      if ((a[1] - bl.h) * (b[1] - bl.h) < 0) {
+        const t = (a[1] - bl.h) / (a[1] - b[1]);
+        if (t > 1e-6 && t < 1 - 1e-6) { const p = [a[0] + (b[0] - a[0]) * t, bl.h, a[2] + (b[2] - a[2]) * t]; if (pip(bl.poly, p[0], p[2])) out.push({ b: i, kind: 'roof', t, p }); }
+      }
+    }
+    return out;
+  }
+  function trace(tx, rx, o) {
+    const C = 299792458, lam = C / o.fHz, paths = [];
+    const add = (pts, type, via) => {
+      const pen = [];
+      for (let k = 1; k < pts.length; k++) for (const c of crossings(pts[k - 1], pts[k])) { pen.push(c); if (pen.length > o.maxPen) return; }
+      paths.push({ pts, type, via, pen });
+    };
+    add([tx, rx], 'los', []);
+    const cand = F.filter(f => side(f, tx)), imgs = cand.map(f => mirror(tx, f));
+    cand.forEach((f, i) => { if (!side(f, rx)) return; const c = cross(rx, imgs[i], f); if (c && inFace(f, c.p)) add([tx, c.p, rx], 'r1', [f]); });
+    if (o.maxOrder >= 2) cand.forEach((f1, i) => {
+      const T1 = imgs[i];
+      for (const f2 of F) {
+        if (f2 === f1 || !side(f2, rx) || !side(f2, T1)) continue;
+        const c2 = cross(rx, mirror(T1, f2), f2); if (!c2 || !inFace(f2, c2.p) || !side(f1, c2.p)) continue;
+        const c1 = cross(c2.p, T1, f1); if (!c1 || !inFace(f1, c1.p) || !side(f2, c1.p)) continue;
+        add([tx, c1.p, c2.p, rx], 'r2', [f1, f2]);
+      }
+    });
+    for (const p of paths) {
+      p.legs = []; let d = 0;
+      for (let i = 1; i < p.pts.length; i++) { const l = Math.hypot(p.pts[i][0] - p.pts[i - 1][0], p.pts[i][1] - p.pts[i - 1][1], p.pts[i][2] - p.pts[i - 1][2]); p.legs.push(l); d += l; }
+      p.d = d; p.tau = d / C * 1e9;
+      let pl = 20 * Math.log10(4 * Math.PI * d / lam);
+      for (const f of p.via) pl += f.kind === 'ground' ? o.reflG : o.reflW;
+      for (const c of p.pen) pl += c.kind === 'roof' ? o.penR : o.penW;
+      p.pl = pl;
+    }
+    const best = Math.min(...paths.map(p => p.pl));
+    paths.forEach(p => p.rel = best - p.pl);
+    paths.sort((a, b) => b.rel - a.rel);
+    return { kept: paths.filter(p => p.rel >= -o.relCut), total: paths.length };
+  }
+  return { setBuildings, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
+})();
+</script>
+
+<script>
+/* ===== Site ===== */
+const SITE = {
+  bs: { lat: 61.1729384, lon: -149.8841974 },
+  ues: [
+    [61.1735872, -149.8857155], [61.1721515, -149.8827259], [61.1754019, -149.8838769], [61.1746329, -149.8828644],
+    [61.1736982, -149.8812983], [61.1726030, -149.8789537], [61.1758706, -149.8926454], [61.1724572, -149.8923047]
+  ].map(([lat, lon]) => ({ lat, lon }))
+};
+const UE_H = 1.5, REL_CUT = 40, TOP_ALL = 3;
+const $ = s => document.querySelector(s);
+const st = { h0: null, osm: null, sel: 0, cache: {}, viewer: null, tileset: null, hi: null };
+let Mgeo, MgeoInv, Mdisp;
+
+function status(msg, err) { const s = $('#status'); s.textContent = msg; s.classList.toggle('err', !!err); }
+const fmt = (n, d = 1) => (n < 0 ? '−' : '') + Math.abs(n).toFixed(d);
+
+/* ===== coordinates ===== */
+function initFrames() {
+  Mgeo = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(SITE.bs.lon, SITE.bs.lat, 0));
+  MgeoInv = Cesium.Matrix4.inverseTransformation(Mgeo, new Cesium.Matrix4());
+}
+function toLocal(lon, lat) {
+  const q = Cesium.Matrix4.multiplyByPoint(MgeoInv, Cesium.Cartesian3.fromDegrees(lon, lat, 0), new Cesium.Cartesian3());
+  return [q.x, q.y];
+}
+function setDispFrame() { Mdisp = Cesium.Transforms.eastNorthUpToFixedFrame(Cesium.Cartesian3.fromDegrees(SITE.bs.lon, SITE.bs.lat, st.h0)); }
+const toWorld = p => Cesium.Matrix4.multiplyByPoint(Mdisp, new Cesium.Cartesian3(p[0], p[2], p[1]), new Cesium.Cartesian3());
+function toLLH(p) { const c = Cesium.Cartographic.fromCartesian(toWorld(p)); return [+Cesium.Math.toDegrees(c.longitude).toFixed(7), +Cesium.Math.toDegrees(c.latitude).toFixed(7), +c.height.toFixed(2)]; }
+
+/* ===== OSM buildings ===== */
+function centerAndRadius() {
+  const pts = [SITE.bs, ...SITE.ues];
+  const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length, lon = pts.reduce((s, p) => s + p.lon, 0) / pts.length;
+  const mPerLat = 111320, mPerLon = 111320 * Math.cos(lat * Math.PI / 180);
+  const r = Math.max(...pts.map(p => Math.hypot((p.lat - lat) * mPerLat, (p.lon - lon) * mPerLon)));
+  return { lat, lon, r: Math.ceil(r + 200) };
+}
+async function fetchOSM() {
+  const { lat, lon, r } = centerAndRadius();
+  const q = `[out:json][timeout:40];(way["building"](around:${r},${lat},${lon});relation["building"](around:${r},${lat},${lon}););out tags geom;`;
+  const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+  let lastErr;
+  for (const ep of eps) {
+    try {
+      const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      if (!res.ok) throw new Error(ep + ' 回應 ' + res.status);
+      return await res.json();
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+function heightOf(t) {
+  const p = s => { if (!s) return NaN; const ft = /'|ft/i.test(s); const v = parseFloat(s); return ft ? v * 0.3048 : v; };
+  const h = p(t.height); if (h > 0) return { h, src: 'height' };
+  const lv = parseFloat(t['building:levels']); if (lv > 0) return { h: lv * 3.5, src: 'levels' };
+  return { h: null, src: 'default' };
+}
+function parseOSM(json) {
+  const out = [];
+  for (const el of json.elements || []) {
+    const tags = el.tags || {}, rings = [];
+    if (el.type === 'way' && el.geometry) rings.push(el.geometry);
+    else if (el.type === 'relation' && el.members) el.members.forEach(m => {
+      if (m.role === 'outer' && m.geometry && m.geometry.length > 3) { const g = m.geometry; if (g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon) rings.push(g); }
+    });
+    const hh = heightOf(tags);
+    rings.forEach(g => out.push({ id: el.type + '/' + el.id, name: tags.name || '', h: hh.h, src: hh.src, ll: g.map(p => [p.lon, p.lat]) }));
+  }
+  return out;
+}
+
+/* ===== model setup ===== */
+let bsBuilding = -1, bsOverride = null;
+function buildModel() {
+  const defH = +$('#defH').value || 9;
+  const { r } = centerAndRadius();
+  const list = st.osm.map(b => ({ h: b.h ?? defH, poly: b.ll.map(([lon, lat]) => toLocal(lon, lat)) }));
+  RT.setBuildings(list, r + 300);
+  const bi = RT.buildingAt(0, 0);
+  bsBuilding = bi >= 0 ? RT.building(bi).src : -1;
+  if (bsBuilding >= 0 && bsOverride != null) { list[bsBuilding].h = bsOverride; RT.setBuildings(list, r + 300); }
+  st.list = list;
+  if (bsBuilding >= 0 && bsOverride == null) $('#bsH').value = list[bsBuilding].h.toFixed(1);
+  st.cache = {};
+}
+function txPos() {
+  const roof = bsBuilding >= 0 ? st.list[bsBuilding].h : (+$('#bsH').value || 0);
+  return [0, roof + (+$('#mast').value || 0), 0];
+}
+function uePos(i) { const [x, z] = toLocal(SITE.ues[i].lon, SITE.ues[i].lat); return [x, UE_H, z]; }
+function opts() {
+  return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, relCut: REL_CUT };
+}
+function traceUE(i) {
+  if (!st.cache[i]) {
+    const rx = uePos(i), r = RT.trace(txPos(), rx, opts());
+    const ib = RT.buildingAt(rx[0], rx[2]);
+    st.cache[i] = { ...r, indoor: ib >= 0 };
+  }
+  return st.cache[i];
+}
+function describe(p) {
+  const base = { los: '直射', r1: '一次反射', r2: '二次反射' }[p.type];
+  const pen = p.pen.length;
+  const label = p.type === 'los' && !pen ? '直射 LOS' : base + (pen ? '＋穿透' : '');
+  const parts = [];
+  if (p.via.length) parts.push(p.via.map(f => f.kind === 'ground' ? '地面' : '牆面').join(' → '));
+  if (pen) parts.push(`穿越 ${pen} 面（${p.pen.filter(c => c.kind === 'wall').length} 牆 ${p.pen.filter(c => c.kind === 'roof').length} 頂）`);
+  return { label, detail: parts.join('；') || '無遮擋' };
+}
+function stats(kept) {
+  if (!kept.length) return null;
+  const lin = kept.map(p => Math.pow(10, p.rel / 10)), sp = lin.reduce((a, b) => a + b, 0);
+  const mean = kept.reduce((s, p, i) => s + lin[i] * p.tau, 0) / sp;
+  const rms = Math.sqrt(kept.reduce((s, p, i) => s + lin[i] * (p.tau - mean) ** 2, 0) / sp);
+  const best = kept[0];
+  const eirp = +$('#eirp').value || 0;
+  const prxTot = 10 * Math.log10(kept.reduce((s, p) => s + Math.pow(10, (eirp - p.pl) / 10), 0));
+  return { rms, best, prxTot, tmin: Math.min(...kept.map(p => p.tau)) };
+}
+
+/* ===== colors ===== */
+const STOPS = ['#5b6cff', '#e0479e', '#ffcc4d'].map(c => Cesium.Color.fromCssColorString(c));
+function ramp(t) { t = Math.max(0, Math.min(1, t)); const a = t < .5 ? 0 : 1, k = t < .5 ? t * 2 : (t - .5) * 2; return Cesium.Color.lerp(STOPS[a], STOPS[a + 1], k, new Cesium.Color()); }
+
+/* ===== drawing ===== */
+let raysDS, bldDS, siteDS, drawn = [];
+function drawSite() {
+  siteDS.entities.removeAll();
+  const tx = txPos();
+  siteDS.entities.add({ polyline: { positions: [toWorld([0, tx[1] - (+$('#mast').value || 0), 0]), toWorld(tx)], width: 3, arcType: Cesium.ArcType.NONE, material: Cesium.Color.ORANGE } });
+  siteDS.entities.add({ position: toWorld(tx), point: { pixelSize: 13, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+    label: { text: 'BS', font: '600 13px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -18), fillColor: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+  SITE.ues.forEach((u, i) => {
+    const on = st.sel === i || st.sel === 'all';
+    const e = siteDS.entities.add({ position: toWorld(uePos(i)),
+      point: { pixelSize: on ? 12 : 8, color: Cesium.Color.fromCssColorString('#4fd1e0').withAlpha(on ? 1 : .6), outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: String(i + 1), font: '600 12px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+    e.ueIndex = i;
+  });
+}
+function drawBuildings() {
+  bldDS.entities.removeAll();
+  if (!$('#showB').checked) return;
+  st.osm.forEach((b, i) => {
+    const h = st.list[i].h;
+    bldDS.entities.add({ polygon: {
+      hierarchy: Cesium.Cartesian3.fromDegreesArray(b.ll.flat()), height: st.h0, extrudedHeight: st.h0 + h,
+      material: st.tileset
+        ? (i === bsBuilding ? Cesium.Color.ORANGE : Cesium.Color.CYAN).withAlpha(i === bsBuilding ? .3 : .16)
+        : Cesium.Color.fromCssColorString(i === bsBuilding ? '#e8c9a0' : '#d9dee4'),
+      outline: true, outlineColor: st.tileset ? Cesium.Color.CYAN.withAlpha(.55) : Cesium.Color.fromCssColorString('#5f7184') } });
+  });
+}
+function drawRays() {
+  raysDS.entities.removeAll(); drawn = [];
+  const ghost = $('#ghost').checked;
+  const sets = st.sel === 'all' ? SITE.ues.map((_, i) => traceUE(i).kept.slice(0, TOP_ALL)) : [traceUE(st.sel).kept];
+  sets.forEach(kept => kept.forEach(p => {
+    const w = 1 + p.rel / REL_CUT, col = ramp(w);
+    const e = raysDS.entities.add({ polyline: {
+      positions: p.pts.map(toWorld), width: 2 + 4 * w, arcType: Cesium.ArcType.NONE,
+      material: new Cesium.ColorMaterialProperty(col),
+      depthFailMaterial: ghost ? new Cesium.PolylineDashMaterialProperty({ color: col.withAlpha(.6), dashLength: 10 }) : undefined } });
+    const marks = p.pen.map(c => raysDS.entities.add({ position: toWorld(c.p), point: { pixelSize: 6, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } }));
+    drawn.push({ p, e, col, w, marks });
+  }));
+}
+function highlight(i) {
+  drawn.forEach((d, k) => {
+    const dim = i != null && k !== i;
+    d.e.polyline.material = new Cesium.ColorMaterialProperty(d.col.withAlpha(dim ? .12 : 1));
+    d.e.polyline.width = (2 + 4 * d.w) * (i === k ? 1.6 : 1);
+    d.marks.forEach(m => m.show = !dim);
+  });
+  document.querySelectorAll('tr.p').forEach(tr => tr.classList.toggle('on', +tr.dataset.i === i));
+}
+
+/* ===== panel ===== */
+function renderUEButtons() {
+  const box = $('#ues');
+  box.innerHTML = SITE.ues.map((_, i) => `<button type="button" data-u="${i}" aria-pressed="${st.sel === i}">${i + 1}</button>`).join('') +
+    `<button type="button" data-u="all" aria-pressed="${st.sel === 'all'}">全部</button>`;
+}
+function renderPanel() {
+  const tx = txPos();
+  if (st.sel === 'all') {
+    $('#sumTitle').textContent = '全部 UE 摘要';
+    $('#pdpBlock').hidden = true;
+    $('#stats').innerHTML = `<div><dt>BS 天線離地</dt><dd>${fmt(tx[1])}<small>m</small></dd></div><div><dt>地圖上每個 UE 顯示</dt><dd>${TOP_ALL}<small>條最強路徑</small></dd></div>`;
+    $('#tblTitle').textContent = '各 UE';
+    $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>最強路徑</th><th>接收</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
+      const r = traceUE(i), s = stats(r.kept), d = Math.hypot(...uePos(i).map((v, k) => v - tx[k]));
+      if (!s) return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit" colspan="3">無有效路徑（穿越超過 4 面）</td></tr>`;
+      return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit">${describe(s.best).label}</td><td>${fmt(s.prxTot)} dBm</td><td>${fmt(s.rms)} ns</td></tr>`;
+    }).join('');
+    return;
+  }
+  const r = traceUE(st.sel), kept = r.kept, s = stats(kept), rx = uePos(st.sel);
+  const d = Math.hypot(rx[0] - tx[0], rx[1] - tx[1], rx[2] - tx[2]);
+  $('#sumTitle').textContent = `UE ${st.sel + 1} 通道摘要`;
+  if (!s) {
+    $('#pdpBlock').hidden = true;
+    $('#stats').innerHTML = `<div><dt>BS 到 UE 直線距離</dt><dd>${fmt(d)}<small>m</small></dd></div><div><dt>結果</dt><dd style="font-family:inherit;font-size:14px">沒有穿越 4 面以內的路徑</dd></div>`;
+    $('#tblTitle').textContent = '路徑（0 條）'; $('#tbl').innerHTML = '';
+    return;
+  }
+  $('#pdpBlock').hidden = false;
+  $('#stats').innerHTML =
+    `<div><dt>BS 到 UE 直線距離</dt><dd>${fmt(d)}<small>m</small></dd></div>` +
+    `<div><dt>UE 位置</dt><dd style="font-family:inherit;font-size:15px">${r.indoor ? '室內（OSM 建築內）' : '室外'}</dd></div>` +
+    `<div><dt>最強路徑</dt><dd style="font-family:inherit;font-size:15px">${describe(s.best).label}</dd></div>` +
+    `<div><dt>最強路徑損耗</dt><dd>${fmt(s.best.pl)}<small>dB</small></dd></div>` +
+    `<div><dt>總接收功率</dt><dd>${fmt(s.prxTot)}<small>dBm/10 MHz</small></dd></div>` +
+    `<div><dt>RMS 時延擴展</dt><dd>${fmt(s.rms)}<small>ns</small></dd></div>`;
+  $('#tblTitle').textContent = `路徑（顯示 ${kept.length} 條，共找到 ${r.total} 條）`;
+  const eirp = +$('#eirp').value || 0;
+  $('#tbl').innerHTML = '<tr><th>路徑</th><th>長度</th><th>附加時延</th><th>損耗</th><th>相對</th></tr>' + kept.map((p, i) => {
+    const ds = describe(p);
+    return `<tr class="p" data-i="${i}"><td><span class="sw" style="background:${drawn[i] ? drawn[i].col.toCssHexString() : '#888'}"></span>${ds.label}<small>${ds.detail}</small></td>` +
+      `<td>${fmt(p.d)} m</td><td>${fmt(p.tau - s.tmin)} ns</td><td>${fmt(p.pl)} dB<small>${fmt(eirp - p.pl)} dBm</small></td><td>${fmt(p.rel)} dB</td></tr>`;
+  }).join('');
+  // PDP
+  const W = 360, H = 150, L = 34, R = 10, T = 10, Bm = 28, pw = W - L - R, ph = H - T - Bm;
+  const maxEx = Math.max(...kept.map(p => p.tau - s.tmin), 1);
+  const steps = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+  const step = steps.find(v => v * 4 >= maxEx * 1.05) || 2000, xmax = Math.ceil(maxEx * 1.05 / step) * step;
+  const X = v => L + v / xmax * pw, Y = v => T + (-v) / REL_CUT * ph;
+  let g = '';
+  for (let db = 0; db >= -REL_CUT; db -= 10) g += `<line x1="${L}" x2="${W - R}" y1="${Y(db)}" y2="${Y(db)}" stroke="#2a3541"/><text x="${L - 4}" y="${Y(db) + 3}" text-anchor="end">${db ? '−' + (-db) : 0}</text>`;
+  for (let v = 0; v <= xmax + 1e-9; v += step) g += `<text x="${X(v)}" y="${H - Bm + 13}" text-anchor="middle">${v}</text>`;
+  g += `<text x="${W - R}" y="${H - 3}" text-anchor="end">附加時延 ns</text><text x="${L - 4}" y="${H - 3}" text-anchor="end">dB</text>`;
+  kept.slice().reverse().forEach(p => { const c = ramp(1 + p.rel / REL_CUT).toCssHexString(), x = X(p.tau - s.tmin); g += `<line x1="${x}" x2="${x}" y1="${Y(-REL_CUT)}" y2="${Y(p.rel)}" stroke="${c}" stroke-width="2"/><circle cx="${x}" cy="${Y(p.rel)}" r="3" fill="${c}"/>`; });
+  $('#pdp').innerHTML = g;
+}
+function refresh(rebuild) {
+  if (!st.osm) return;
+  if (rebuild) buildModel();
+  setDispFrame();
+  drawSite(); drawBuildings(); drawRays(); renderUEButtons(); renderPanel(); highlight(null);
+}
+
+/* ===== events ===== */
+$('#ues').addEventListener('click', e => { const b = e.target.closest('[data-u]'); if (!b || !st.osm) return; st.sel = b.dataset.u === 'all' ? 'all' : +b.dataset.u; refresh(false); });
+$('#tbl').addEventListener('pointerover', e => { const tr = e.target.closest('tr.p[data-i]'); if (tr && st.hi == null) highlight(+tr.dataset.i); });
+$('#tbl').addEventListener('pointerleave', () => { if (st.hi == null) highlight(null); });
+$('#tbl').addEventListener('click', e => {
+  const tr = e.target.closest('tr.p'); if (!tr) return;
+  if (tr.dataset.u != null) { st.sel = +tr.dataset.u; refresh(false); return; }
+  const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
+});
+['#fMHz', '#eirp', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
+$('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
+$('#defH').addEventListener('change', () => refresh(true));
+$('#bsH').addEventListener('change', () => { bsOverride = +$('#bsH').value; refresh(true); });
+$('#h0').addEventListener('change', () => { st.h0 = +$('#h0').value; refresh(false); });
+$('#showB').addEventListener('change', () => drawBuildings());
+$('#ghost').addEventListener('change', () => { drawRays(); highlight(null); });
+
+function download(name, obj) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 1)], { type: 'application/json' }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$('#dlB').onclick = () => { if (st.osm) download('buildings_osm.json', { attribution: '© OpenStreetMap contributors', buildings: st.osm }); };
+$('#dlR').onclick = () => {
+  if (!st.osm) return;
+  const out = { frequency_MHz: +$('#fMHz').value, eirp_dBm: +$('#eirp').value, h0_ellipsoid_m: st.h0,
+    bs: { lat: SITE.bs.lat, lon: SITE.bs.lon, antenna_agl_m: txPos()[1] }, ues: SITE.ues.map((u, i) => {
+      const r = traceUE(i);
+      return { id: i + 1, lat: u.lat, lon: u.lon, indoor: r.indoor, paths: r.kept.map(p => ({ type: describe(p).label, length_m: +p.d.toFixed(2), delay_ns: +p.tau.toFixed(2), pathloss_dB: +p.pl.toFixed(2), relative_dB: +p.rel.toFixed(2), vertices_lon_lat_h: p.pts.map(toLLH) })) };
+    }) };
+  download('rays.json', out);
+};
+$('#upBtn').onclick = () => $('#upB').click();
+$('#upB').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const j = JSON.parse(await f.text()); st.osm = j.buildings || parseOSM(j); status(`已載入本機建築資料：${st.osm.length} 棟。`); if (st.viewer) refresh(true); }
+  catch (err) { status('這個檔案不是建築 JSON：' + err.message, true); }
+};
+
+/* ===== start ===== */
+const KEY_INFO = {
+  ion: { lbl: 'Cesium ion access token', store: 'ionToken', ph: 'eyJhbGciOi…' },
+  google: { lbl: 'Google Map Tiles API 金鑰', store: 'gmtKey', ph: 'AIza…' }
+};
+function syncMode() {
+  const m = $('#mode').value, info = KEY_INFO[m];
+  $('#keyWrap').hidden = !info; $('#remWrap').hidden = !info;
+  if (info) {
+    $('#keyLbl').textContent = info.lbl; $('#key').placeholder = info.ph;
+    try { $('#key').value = localStorage.getItem(info.store) || ''; } catch (e) { $('#key').value = ''; }
+  }
+}
+try { const m = localStorage.getItem('bgMode'); if (m) $('#mode').value = m; } catch (e) {}
+$('#mode').addEventListener('change', syncMode);
+syncMode();
+renderUEButtons();
+
+function resetViewer() {
+  if (st.viewer) { st.viewer.destroy(); st.viewer = null; st.tileset = null; }
+  document.getElementById('map').innerHTML = '';
+  st.h0 = null;
+}
+async function createViewer(mode, key) {
+  const base = { baseLayerPicker: false, geocoder: false, timeline: false, animation: false, sceneModePicker: false, homeButton: false,
+    navigationHelpButton: false, infoBox: false, selectionIndicator: false, fullscreenButton: false };
+  let viewer;
+  if (mode === 'sat' || mode === 'osm') {
+    const provider = mode === 'sat'
+      ? new Cesium.UrlTemplateImageryProvider({ url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', maximumLevel: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' })
+      : new Cesium.OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' });
+    viewer = new Cesium.Viewer('map', { ...base, baseLayer: new Cesium.ImageryLayer(provider), terrainProvider: new Cesium.EllipsoidTerrainProvider() });
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+  } else {
+    if (mode === 'google') Cesium.GoogleMaps.defaultApiKey = key; else Cesium.Ion.defaultAccessToken = key;
+    viewer = new Cesium.Viewer('map', { ...base, globe: false, baseLayer: false });
+    const tileset = mode === 'google' ? await Cesium.createGooglePhotorealistic3DTileset(key) : await Cesium.createGooglePhotorealistic3DTileset();
+    tileset.showCreditsOnScreen = true;
+    viewer.scene.primitives.add(tileset);
+    st.tileset = tileset;
+  }
+  st.viewer = viewer; st.mode = mode;
+  raysDS = new Cesium.CustomDataSource('rays'); bldDS = new Cesium.CustomDataSource('osm'); siteDS = new Cesium.CustomDataSource('site');
+  [bldDS, raysDS, siteDS].forEach(d => viewer.dataSources.add(d));
+  new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas).setInputAction(m => {
+    const p = viewer.scene.pick(m.position); if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  initFrames();
+  const c = centerAndRadius();
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 60), c.r),
+    { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(15), Cesium.Math.toRadians(-38), c.r * 2.4), duration: 0 });
+}
+
+$('#go').onclick = async () => {
+  const mode = $('#mode').value, info = KEY_INFO[mode], key = $('#key').value.trim();
+  if (info && !key) { status('請先輸入' + info.lbl + '。', true); return; }
+  try {
+    localStorage.setItem('bgMode', mode);
+    if (info) $('#remember').checked ? localStorage.setItem(info.store, key) : localStorage.removeItem(info.store);
+  } catch (e) {}
+  $('#go').disabled = true;
+  try {
+    if (st.viewer && st.mode !== mode) resetViewer();
+    if (!st.viewer) { status('載入地圖…'); await createViewer(mode, key); }
+    status('從 OpenStreetMap 抓取建築…');
+    const osmP = st.osm ? Promise.resolve(null) : fetchOSM();
+    if (st.h0 == null) {
+      if (st.tileset) {
+        const samples = await st.viewer.scene.sampleHeightMostDetailed(SITE.ues.map(u => Cesium.Cartographic.fromDegrees(u.lon, u.lat)));
+        const hs = samples.map(x => x.height).filter(h => Number.isFinite(h)).sort((a, b) => a - b);
+        st.h0 = hs.length ? hs[Math.floor(hs.length / 2)] : 30;
+      } else st.h0 = 0;
+    }
+    $('#h0').value = st.h0.toFixed(1);
+    if (!st.tileset) $('#showB').checked = true;
+    const osm = await osmP;
+    if (osm) st.osm = parseOSM(osm);
+    if (!st.osm.length) throw new Error('這個範圍內 OSM 沒有建築資料');
+    status('計算射線…');
+    await new Promise(r => setTimeout(r, 30));
+    const t0 = performance.now();
+    refresh(true);
+    const noH = st.osm.filter(b => b.src === 'default').length;
+    status(`完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
+      (bsBuilding < 0 ? '\n注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。' : ''));
+  } catch (e) {
+    console.error(e);
+    const m = String(e && e.message || e);
+    status(/overpass|Failed to fetch|NetworkError/i.test(m) ? 'OpenStreetMap 建築資料抓取失敗，請稍後重試，或用「改用本機建築 JSON」：' + m
+      : /403|401|key|token|Unauthorized|asset/i.test(m) ? (mode === 'ion' ? 'Cesium ion token 無效，或你的帳號沒有 Google 寫實 3D 這個 asset：' : '金鑰無效，或這個專案還沒啟用 Map Tiles API：') + m
+      : '發生錯誤：' + m, true);
+  } finally { $('#go').disabled = false; }
+};
+</script>
+</body>
+</html>
