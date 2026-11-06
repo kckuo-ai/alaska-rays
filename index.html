@@ -60,6 +60,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .lbl{font-size:12px;color:var(--muted)}
 .f output{color:var(--fg);font-family:var(--mono)}
 .mini{width:100%}
+#v2Scatter{width:100%;height:auto;display:block;margin:6px 0}
+#v2Scatter text{font:10px var(--mono);fill:var(--muted)}
+.v2sum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;margin:0 0 8px}
+.v2sum div{min-width:0}.v2sum dt{font-size:11px;color:var(--muted)}.v2sum dd{margin:0;font:500 15px var(--mono)}
+.flag{color:var(--bad)}
 .mini td,.mini th{padding:3px 4px;text-align:left}
 .mini input{width:100%}
 #optHeat{width:100%;height:auto;display:block;image-rendering:pixelated;border:1px solid var(--line);border-radius:4px;margin-top:6px}
@@ -142,7 +147,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <h2>參數</h2>
       <div class="row2">
         <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
-        <label class="f">最大 EIRP (dBm/10 MHz)<input type="number" id="eirp" value="47" step="1"></label>
+        <label class="f">RU 輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
+        <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17" step="0.5"></label>
+        <label class="f">饋線與接頭損耗 (dB)<input type="number" id="cableL" value="1" step="0.5"></label>
+        <label class="f">SAS 授權 maxEirp (dBm/MHz)<input type="number" id="sasE" value="37" step="1"></label>
         <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
         <label class="f">BS 所在建築高度 (m)<input type="number" id="bsH" step="0.5"></label>
         <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
@@ -154,7 +162,8 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <select id="scs"><option value="30" selected>30 kHz</option><option value="15">15 kHz</option></select>
         </label>
         <label class="f">UE 雜訊指數 NF (dB)<input type="number" id="nf" value="7" step="0.5"></label>
-        <label class="f">額外損耗：車內、饋線、校準 (dB)<input type="number" id="extraL" value="0" step="1"></label>
+        <label class="f">額外損耗：車內、校準 (dB)<input type="number" id="extraL" value="0" step="1"></label>
+        <label class="f">SIB1 ss-PBCH-BlockPower (dBm，可留空)<input type="number" id="ssPwr" step="1" placeholder="例如 −5"></label>
       </div>
       <p class="sub" id="lbNote" style="margin-top:8px"></p>
       <div class="tools" style="margin-top:10px">
@@ -174,7 +183,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <select id="secLayout"><option value="fixed">固定間隔 120°，一起轉</option><option value="indep">各扇區獨立設定</option></select>
         </label>
         <div id="fixedCtl" style="display:flex;flex-direction:column;gap:10px">
-          <label class="f">S1 方位角（正北順時針）<output id="azOut"></output><input type="range" id="az" min="0" max="359" step="1" value="0"></label>
+          <label class="f">S1 方位角（正北順時針）<output id="azOut"></output><input type="range" id="az" min="0" max="359" step="1" value="30"></label>
           <label class="f">機械下傾角 <output id="tiltOut"></output><input type="range" id="tilt" min="0" max="20" step="0.5" value="4"></label>
         </div>
         <div id="indepCtl" hidden>
@@ -188,6 +197,11 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <label class="f">水平 3 dB 波束寬 (°)<input type="number" id="hpbw" value="65" step="5"></label>
           <label class="f">垂直 3 dB 波束寬 (°)<input type="number" id="vpbw" value="10" step="1"></label>
           <label class="f">面板離桅杆中心 (m)<input type="number" id="panelOff" value="0.5" step="0.1"></label>
+        </div>
+        <div class="row2">
+          <label class="f">S1 的 PCI<input type="number" id="pci0" value="13"></label>
+          <label class="f">S2 的 PCI<input type="number" id="pci1" value="15"></label>
+          <label class="f">S3 的 PCI<input type="number" id="pci2" value="14"></label>
         </div>
         <div>
           <span class="lbl">地圖上顯示的扇區</span>
@@ -217,6 +231,20 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </div>
     </section>
 
+    <section class="block" id="v2Block">
+      <h2>V2 實測對照（2026-11-04 路測，57 點）</h2>
+      <div class="tools">
+        <label class="chk"><input type="checkbox" id="showM" checked>在地圖上顯示實測點</label>
+        <button type="button" id="v2Preset">套用 V2 現場設定</button>
+      </div>
+      <p class="sub" style="margin-top:6px">現場設定：天線離地 13 m、三扇區方位 30° / 150° / 270°（PCI 13 / 15 / 14）。點地圖上的實測點可以看該點的射線和比對結果。</p>
+      <div class="tools" style="margin-top:8px">
+        <button type="button" id="calLos">用 LOS 點校準額外損耗</button>
+        <button type="button" id="calAll">用全部點校準</button>
+      </div>
+      <div id="v2Out" style="margin-top:10px"><p class="sub">載入地圖並計算後顯示比對結果。</p></div>
+    </section>
+
     <section class="block" id="optBlock">
       <h2>自動最佳化天線方位角與下傾角</h2>
       <div class="row2">
@@ -227,6 +255,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
           <select id="optGoal"><option value="mean">所有 UE 平均分數最高</option><option value="min">最差的 UE 優先</option></select>
         </label>
         <label class="f">下傾角上限 (°)<input type="number" id="optTiltMax" value="15" step="1"></label>
+        <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="optUseM" checked>也納入 V2 實測點的位置（57 點，含無服務點）</label>
         <label class="f">RSRP 權重 <output id="optWOut"></output><input type="range" id="optW" min="0" max="100" step="5" value="50"></label>
       </div>
       <p class="sub" style="margin-top:6px">每個 UE 的分數 = RSRP 分數 × 權重 + SINR 分數 × (1 − 權重)。RSRP 從 −120 到 −80 dBm 線性對應 0–100 分，SINR 從 −5 到 25 dB 對應 0–100 分。</p>
@@ -267,7 +296,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <ul class="notes">
         <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
         <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
-        <li>扇區天線用 3GPP TR 38.901 的面板方向圖（水平、垂直各以 3 dB 波束寬決定，前後比 30 dB），EIRP 指主瓣方向；全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
+        <li>EIRP 取「RU 輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m，未計繞射與散射，只列比最強路徑弱 40 dB 以內者。</li>
         <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
@@ -279,10 +308,12 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 /* ===== Ray engine (local ENU: x = east, y = up, z = north, meters) ===== */
 const RT = (() => {
   let B = [], F = [], GR = 700;
+  const CELL = 40; let grid = new Map(), gx0 = 0, gz0 = 0, stamp = new Int32Array(0), stampN = 0;
   const area = p => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return a / 2; };
   const pip = (poly, x, z) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) ins = !ins; } return ins; };
+  const ckey = (cx, cz) => (cx + 50000) * 100000 + (cz + 50000);
   function setBuildings(list, groundR) {
-    GR = groundR; B = []; F = [];
+    GR = groundR; B = []; F = []; grid = new Map();
     list.forEach((src, si) => {
       let poly = src.poly.slice();
       if (poly.length > 3) { const f = poly[0], l = poly[poly.length - 1]; if (Math.abs(f[0] - l[0]) < 1e-6 && Math.abs(f[1] - l[1]) < 1e-6) poly.pop(); }
@@ -299,6 +330,14 @@ const RT = (() => {
         F.push(f); b.faces.push(f);
       }
     });
+    gx0 = Math.min(0, ...B.map(b => b.x0)) - CELL; gz0 = Math.min(0, ...B.map(b => b.z0)) - CELL;
+    B.forEach((b, i) => {
+      for (let cx = Math.floor((b.x0 - 1 - gx0) / CELL); cx <= Math.floor((b.x1 + 1 - gx0) / CELL); cx++)
+        for (let cz = Math.floor((b.z0 - 1 - gz0) / CELL); cz <= Math.floor((b.z1 + 1 - gz0) / CELL); cz++) {
+          const k = ckey(cx, cz); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(i);
+        }
+    });
+    stamp = new Int32Array(B.length); stampN = 0; visCache = new Map();
     F.push({ kind: 'ground' });
   }
   const sd = (f, p) => f.kind === 'ground' ? p[1] : f.nx * p[0] + f.nz * p[2] - f.c;
@@ -309,46 +348,98 @@ const RT = (() => {
     const t = da / (da - db); if (t <= 1e-6 || t >= 1 - 1e-6) return null;
     return { t, p: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t] };
   }
-  function buildingAt(x, z) { for (let i = 0; i < B.length; i++) { const b = B[i]; if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && pip(b.poly, x, z)) return i; } return -1; }
+  function buildingAt(x, z) {
+    const a = grid.get(ckey(Math.floor((x - gx0) / CELL), Math.floor((z - gz0) / CELL))); if (!a) return -1;
+    for (const i of a) { const b = B[i]; if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && pip(b.poly, x, z)) return i; }
+    return -1;
+  }
   function inFace(f, p) {
     if (f.kind === 'ground') return p[0] * p[0] + p[2] * p[2] <= GR * GR && buildingAt(p[0], p[2]) < 0;
     if (p[1] <= 0 || p[1] >= f.h) return false;
     const s = ((p[0] - f.ax) * f.dx + (p[2] - f.az) * f.dz) / f.len2;
     return s > 1e-6 && s < 1 - 1e-6;
   }
-  function crossings(a, b) {
+  // visit buildings in grid cells along the segment (2D DDA)
+  function segBuildings(a, b, fn) {
+    stampN++; if (stampN > 2e9) { stamp.fill(0); stampN = 1; }
+    const ax = a[0] - gx0, az = a[2] - gz0, dx = b[0] - a[0], dz = b[2] - a[2];
+    let cx = Math.floor(ax / CELL), cz = Math.floor(az / CELL);
+    const ex = Math.floor((b[0] - gx0) / CELL), ez = Math.floor((b[2] - gz0) / CELL);
+    const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+    let tMx = dx !== 0 ? ((cx + (dx > 0 ? 1 : 0)) * CELL - ax) / dx : Infinity, tMz = dz !== 0 ? ((cz + (dz > 0 ? 1 : 0)) * CELL - az) / dz : Infinity;
+    const tDx = dx !== 0 ? CELL / Math.abs(dx) : Infinity, tDz = dz !== 0 ? CELL / Math.abs(dz) : Infinity;
+    for (let n = 0; n < 20000; n++) {
+      const list = grid.get(ckey(cx, cz));
+      if (list) for (const i of list) if (stamp[i] !== stampN) { stamp[i] = stampN; fn(i); }
+      if (cx === ex && cz === ez) break;
+      if (tMx < tMz) { tMx += tDx; cx += sx; } else { tMz += tDz; cz += sz; }
+      if (Math.min(tMx, tMz) > 1 + 1e-9 && cx === ex && cz === ez) { /* reached */ }
+    }
+  }
+  function crossings(a, b, limit = Infinity) {
     const out = [];
     const mnx = Math.min(a[0], b[0]), mxx = Math.max(a[0], b[0]), mnz = Math.min(a[2], b[2]), mxz = Math.max(a[2], b[2]), mny = Math.min(a[1], b[1]);
-    for (let i = 0; i < B.length; i++) {
+    segBuildings(a, b, i => {
+      if (out.length > limit) return;
       const bl = B[i];
-      if (bl.x1 < mnx || bl.x0 > mxx || bl.z1 < mnz || bl.z0 > mxz || mny >= bl.h) continue;
+      if (bl.x1 < mnx || bl.x0 > mxx || bl.z1 < mnz || bl.z0 > mxz || mny >= bl.h) return;
       for (const f of bl.faces) { const c = cross(a, b, f); if (c && inFace(f, c.p)) out.push({ b: i, kind: 'wall', t: c.t, p: c.p }); }
       if ((a[1] - bl.h) * (b[1] - bl.h) < 0) {
         const t = (a[1] - bl.h) / (a[1] - b[1]);
         if (t > 1e-6 && t < 1 - 1e-6) { const p = [a[0] + (b[0] - a[0]) * t, bl.h, a[2] + (b[2] - a[2]) * t]; if (pip(bl.poly, p[0], p[2])) out.push({ b: i, kind: 'roof', t, p }); }
       }
+    });
+    return out;
+  }
+  // faces with an unobstructed view from point p (sampled at a few spots on each wall)
+  let visCache = new Map();
+  function visibleFaces(p, maxR) {
+    const key = p.map(v => v.toFixed(2)).join(',') + '|' + maxR;
+    if (visCache.has(key)) return visCache.get(key);
+    const out = [];
+    for (const f of F) {
+      if (f.kind === 'ground') { out.push(f); continue; }
+      if (!side(f, p)) continue;
+      const mx = f.ax + f.dx / 2 - p[0], mz = f.az + f.dz / 2 - p[2];
+      if (Math.hypot(mx, mz) - Math.sqrt(f.len2) / 2 > maxR) continue;
+      const ys = [Math.min(1.5, f.h * .5), f.h * .5, f.h * .85];
+      let vis = false;
+      for (const s of [.5, .1, .9, .3, .7]) {
+        for (const y of ys) {
+          const q = [f.ax + f.dx * s + f.nx * .05, y, f.az + f.dz * s + f.nz * .05];
+          if (crossings(p, q, 0).length === 0) { vis = true; break; }
+        }
+        if (vis) break;
+      }
+      if (vis) out.push(f);
     }
+    if (visCache.size > 400) visCache.clear();
+    visCache.set(key, out);
     return out;
   }
   function trace(tx, rx, o) {
     const C = 299792458, lam = C / o.fHz, paths = [];
     const add = (pts, type, via) => {
       const pen = [];
-      for (let k = 1; k < pts.length; k++) for (const c of crossings(pts[k - 1], pts[k])) { pen.push(c); if (pen.length > o.maxPen) return; }
+      for (let k = 1; k < pts.length; k++) { for (const c of crossings(pts[k - 1], pts[k], o.maxPen)) pen.push(c); if (pen.length > o.maxPen) return; }
       paths.push({ pts, type, via, pen });
     };
     add([tx, rx], 'los', []);
     const cand = F.filter(f => side(f, tx)), imgs = cand.map(f => mirror(tx, f));
     cand.forEach((f, i) => { if (!side(f, rx)) return; const c = cross(rx, imgs[i], f); if (c && inFace(f, c.p)) add([tx, c.p, rx], 'r1', [f]); });
-    if (o.maxOrder >= 2) cand.forEach((f1, i) => {
-      const T1 = imgs[i];
-      for (const f2 of F) {
-        if (f2 === f1 || !side(f2, rx) || !side(f2, T1)) continue;
-        const c2 = cross(rx, mirror(T1, f2), f2); if (!c2 || !inFace(f2, c2.p) || !side(f1, c2.p)) continue;
-        const c1 = cross(c2.p, T1, f1); if (!c1 || !inFace(f1, c1.p) || !side(f2, c1.p)) continue;
-        add([tx, c1.p, c2.p, rx], 'r2', [f1, f2]);
+    if (o.maxOrder >= 2) {
+      // second order: first leg leaves from a wall the BS can see, last leg arrives from a wall the UE can see
+      const VT = visibleFaces(tx, 800), VR = visibleFaces(rx, 500).filter(f => side(f, rx));
+      for (const f1 of VT) {
+        const T1 = mirror(tx, f1);
+        for (const f2 of VR) {
+          if (f2 === f1 || !side(f2, T1)) continue;
+          const c2 = cross(rx, mirror(T1, f2), f2); if (!c2 || !inFace(f2, c2.p) || !side(f1, c2.p)) continue;
+          const c1 = cross(c2.p, T1, f1); if (!c1 || !inFace(f1, c1.p) || !side(f2, c1.p)) continue;
+          add([tx, c1.p, c2.p, rx], 'r2', [f1, f2]);
+        }
       }
-    });
+    }
     for (const p of paths) {
       p.legs = []; let d = 0;
       for (let i = 1; i < p.pts.length; i++) { const l = Math.hypot(p.pts[i][0] - p.pts[i - 1][0], p.pts[i][1] - p.pts[i - 1][1], p.pts[i][2] - p.pts[i - 1][2]); p.legs.push(l); d += l; }
@@ -378,15 +469,18 @@ const SITE = {
     [61.1736982, -149.8812983], [61.1726030, -149.8789537], [61.1758706, -149.8926454], [61.1724572, -149.8923047]
   ].map(([lat, lon]) => ({ lat, lon }))
 };
+const V2 = { tower: [61.1728742, -149.88421488], utc: "2026-11-04", rows: [[38,61.1720903,-149.8844744,-99,-11,17,15,0],[39,61.1709414,-149.8844269,-106,-11,9,15,0],[40,61.1706616,-149.8832569,-112,-11,11,15,0],[41,61.1699155,-149.8830957,-119,-12,2,15,0],[42,61.1691207,-149.8821148,-119,-12,5,15,0],[43,61.1680679,-149.8815798,-126,-14,5,15,0],[44,61.1672085,-149.8811563,-127,-15,0,15,0],[45,61.1667477,-149.8805588,null,null,null,null,0],[46,61.1665482,-149.8806022,null,null,null,null,0],[47,61.1665937,-149.8834488,null,null,null,null,0],[48,61.1674583,-149.886345,null,null,null,null,0],[49,61.1695553,-149.886265,-106,-11,5,15,0],[50,61.1725342,-149.8862741,-104,-17,-3,15,0],[51,61.173332,-149.8863359,-101,-11,14,14,0],[52,61.1736887,-149.888122,-96,-11,21,14,0],[53,61.1736797,-149.8959425,-124,-14,1,14,0],[54,61.1740745,-149.897883,-122,-13,3,14,0],[55,61.1776181,-149.8979025,-128,-15,-4,14,0],[56,61.1793577,-149.8978881,null,null,null,null,0],[57,61.1806851,-149.8954412,null,null,null,null,0],[58,61.1806626,-149.8904118,null,null,null,null,0],[59,61.1798431,-149.8865554,null,null,null,null,0],[60,61.1784078,-149.8865239,-129,-17,-6,14,0],[61,61.1764676,-149.8865006,-129,-18,-7,14,0],[62,61.17485,-149.8864259,-110,-11,12,14,0],[63,61.1739195,-149.8864099,-90,-11,22,14,0],[64,61.1735454,-149.8853869,-98,-11,19,14,2],[65,61.1735464,-149.8827531,-100,-11,23,13,0],[66,61.17355,-149.8800515,-106,-11,14,13,0],[67,61.1735427,-149.8757785,-125,-14,1,13,0],[68,61.1735337,-149.8707143,null,null,null,null,0],[69,61.1694855,-149.8682557,null,null,null,null,0],[70,61.1669182,-149.8682296,null,null,null,null,1],[71,61.1664797,-149.8685392,null,null,null,null,1],[72,61.166531,-149.8770578,null,null,null,null,1],[73,61.166504,-149.8798525,null,null,null,null,0],[74,61.1689889,-149.8819143,-121,-12,4,15,0],[75,61.1722469,-149.883019,-104,-13,2,15,0],[76,61.1730742,-149.8827681,null,null,null,null,0],[77,61.1730725,-149.8825892,-98,-11,20,13,0],[78,61.1730745,-149.8821971,-100,-11,9,13,0],[79,61.1730675,-149.8813284,-105,-11,14,13,0],[80,61.1730692,-149.8802258,-111,-11,10,13,0],[81,61.1730687,-149.8792339,-113,-11,9,13,0],[82,61.1734858,-149.8789338,-107,-11,16,13,0],[83,61.1741597,-149.8789363,-115,-12,5,13,0],[84,61.1753023,-149.878938,-120,-12,4,13,0],[85,61.1765661,-149.8789464,-121,-12,5,13,0],[86,61.1771691,-149.8789436,null,null,null,null,0],[87,61.1772325,-149.8830126,-124,-14,2,13,0],[88,61.1767915,-149.8831544,-123,-13,1,13,0],[89,61.175969,-149.8831334,-120,-13,5,13,0],[90,61.1747627,-149.8831234,-113,-12,4,13,0],[91,61.1739158,-149.8831078,-108,-11,7,13,0],[92,61.1736246,-149.8839572,-99,-11,12,13,0],[93,61.1732053,-149.8843833,-100,-13,4,14,0],[94,61.1728113,-149.8845061,-107,-16,0,14,0]] };
 const UE_H = 1.5, REL_CUT = 40, TOP_ALL = 3;
 const ORIG_UES = SITE.ues.map(u => ({ ...u }));
 try { const sv = JSON.parse(localStorage.getItem('alaskaUEs') || 'null'); if (Array.isArray(sv) && sv.length === SITE.ues.length && sv.every(u => Number.isFinite(u.lat) && Number.isFinite(u.lon))) SITE.ues = sv; } catch (e) {}
 const NRB = { 30: { 10: 24, 20: 51, 40: 106 }, 15: { 10: 52, 20: 106, 40: 216 } };
 function lbCfg() {
   const bw = +$('#bw').value, scs = +$('#scs').value, nrb = NRB[scs][bw], nre = 12 * nrb, nf = +$('#nf').value || 0;
-  const eirpTot = (+$('#eirp').value || 0) + 10 * Math.log10(bw / 10) - (+$('#extraL').value || 0);
+  const dev = (+$('#ruP').value || 0) - (+$('#cableL').value || 0) + (+$('#antG').value || 0);
+  const sasVal = $('#sasE').value === '' ? Infinity : +$('#sasE').value, sas = sasVal + 10 * Math.log10(bw);
+  const eirpCap = Math.min(dev, sas), extra = +$('#extraL').value || 0, eirpTot = eirpCap - extra;
   const noise = -174 + 10 * Math.log10(nre * scs * 1e3) + nf;
-  return { bw, scs, nrb, nre, nf, eirpTot, eirpRE: eirpTot - 10 * Math.log10(nre), noise };
+  return { bw, scs, nrb, nre, nf, dev, sas, eirpCap, extra, eirpTot, eirpRE: eirpTot - 10 * Math.log10(nre), noise, sasLimited: sas < dev };
 }
 const eirpTot = () => lbCfg().eirpTot;
 function link(r) {
@@ -399,7 +493,9 @@ const RSRP_LV = [[-80, '很好', '#3ddc84'], [-90, '好', '#a8e05f'], [-100, '�
 const rsrpLv = v => RSRP_LV.find(x => v >= x[0]);
 function syncLbNote() {
   const c = lbCfg();
-  $('#lbNote').textContent = `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。總 EIRP（扣除額外損耗後）${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
+  const ss = $('#ssPwr').value === '' ? null : +$('#ssPwr').value;
+  const ssTxt = ss == null ? '' : `SIB1 宣告 SSB 每子載波 ${fmt(ss)} dBm，加天線增益後約 ${fmt(ss + (+$('#antG').value || 0) - (+$('#cableL').value || 0))} dBm（模型目前用 ${fmt(c.eirpRE + c.extra)} dBm）。`;
+  $('#lbNote').textContent = `設備能力 ${fmt(c.dev)} dBm，SAS 上限 ${Number.isFinite(c.sas) ? fmt(c.sas) : '—'} dBm（${c.bw} MHz），採用 ${fmt(c.eirpCap)} dBm${c.sasLimited ? '，受 SAS 限制' : ''}。` + ssTxt + `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。扣除額外損耗後總 EIRP ${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
 }
 const saveUEs = () => { try { localStorage.setItem('alaskaUEs', JSON.stringify(SITE.ues)); } catch (e) {} };
 const $ = s => document.querySelector(s);
@@ -430,7 +526,7 @@ function toLLH(p) { const c = Cesium.Cartographic.fromCartesian(toWorld(p)); ret
 
 /* ===== OSM buildings ===== */
 function centerAndRadius() {
-  const pts = [SITE.bs, ...ORIG_UES];
+  const pts = [SITE.bs, ...ORIG_UES, ...V2.rows.map(r => ({ lat: r[1], lon: r[2] }))];
   const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length, lon = pts.reduce((s, p) => s + p.lon, 0) / pts.length;
   const mPerLat = 111320, mPerLon = 111320 * Math.cos(lat * Math.PI / 180);
   const r = Math.max(...pts.map(p => Math.hypot((p.lat - lat) * mPerLat, (p.lon - lon) * mPerLon)));
@@ -498,7 +594,13 @@ function txPos() {
   const roof = bsBuilding >= 0 ? st.list[bsBuilding].h : (+$('#bsH').value || 0);
   return [0, roof + (+$('#mast').value || 0), 0];
 }
-function uePos(i) { const [x, z] = toLocal(SITE.ues[i].lon, SITE.ues[i].lat); return [x, UE_H, z]; }
+function uePos(i) {
+  if (typeof i === 'string') { const r = V2.rows[+i.slice(1)]; const [x, z] = toLocal(r[2], r[1]); return [x, UE_H, z]; }
+  const [x, z] = toLocal(SITE.ues[i].lon, SITE.ues[i].lat); return [x, UE_H, z];
+}
+const isUE = k => typeof k === 'number';
+const tgtName = k => isUE(k) ? 'UE ' + (k + 1) : '實測點 S' + V2.rows[+k.slice(1)][0];
+const pciSector = pci => { const a = antCfg(); if (a.mode === 'omni') return 0; const k = [0, 1, 2].find(k => +$('#pci' + k).value === pci); return k == null ? -1 : k; };
 function opts() {
   return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, relCut: REL_CUT };
 }
@@ -592,6 +694,14 @@ function drawSite() {
       point: { pixelSize: on ? 14 : 10, color: Cesium.Color.fromCssColorString(lv[2]).withAlpha(on ? 1 : .7), outlineColor: on ? Cesium.Color.WHITE : Cesium.Color.BLACK, outlineWidth: on ? 2 : 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
       label: { text: (i + 1) + (lk ? '  ' + fmt(lk.rsrp, 0) : ''), font: '600 12px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     e.ueIndex = i;
+  });
+  if ($('#showM').checked) V2.rows.forEach((m, j) => {
+    const on = st.sel === 'm' + j, col = m[3] == null ? '#6b7480' : rsrpLv(m[3])[2];
+    const e = siteDS.entities.add({ position: toWorld(uePos('m' + j)),
+      point: { pixelSize: on ? 13 : 8, color: Cesium.Color.fromCssColorString(col), outlineColor: on ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#10151b'), outlineWidth: on ? 3 : 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: 'S' + m[0] + (m[3] == null ? ' ✕' : ' ' + m[3]), font: '11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, 12), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: on ? undefined : new Cesium.DistanceDisplayCondition(0, 600) } });
+    e.mIndex = j;
   });
 }
 const HSRC = {
@@ -700,7 +810,16 @@ function renderPanel() {
   }
   const r = traceUE(st.sel), kept = r.kept, s = stats(kept), rx = uePos(st.sel);
   const d = Math.hypot(rx[0] - tx[0], rx[1] - tx[1], rx[2] - tx[2]);
-  $('#sumTitle').textContent = `UE ${st.sel + 1} 通道摘要`;
+  $('#sumTitle').textContent = `${tgtName(st.sel)} 通道摘要`;
+  const mExtra = isUE(st.sel) ? '' : (() => {
+    const m = V2.rows[+st.sel.slice(1)], c = lbCfg();
+    if (m[3] == null) return `<div style="grid-column:1/-1"><dt>實測</dt><dd style="font:13px var(--body)">${m[7] === 1 ? '連到其他業者（AT&T 850），視為無服務' : '無服務'}；模型預測最強扇區 RSRP ${Number.isFinite(r.prx[r.serve]) ? fmt(r.prx[r.serve] - 10 * Math.log10(c.nre)) + ' dBm' : '無路徑'}</dd></div>`;
+    const k = pciSector(m[6]), pr = k >= 0 && Number.isFinite(r.prx[k]) ? r.prx[k] - 10 * Math.log10(c.nre) : null;
+    return `<div><dt>實測 RSRP（PCI ${m[6]}）</dt><dd>${fmt(m[3])}<small>dBm${m[7] === 2 ? ' †' : ''}</small></dd></div>` +
+      `<div><dt>模型預測（同 PCI 扇區）</dt><dd>${pr == null ? '—' : fmt(pr)}<small>dBm</small></dd></div>` +
+      `<div><dt>誤差（預測 − 實測）</dt><dd>${pr == null ? '—' : (pr - m[3] > 0 ? '+' : '') + fmt(pr - m[3])}<small>dB</small></dd></div>` +
+      `<div><dt>實測 SNR</dt><dd>${m[5] == null ? '—' : fmt(m[5], 0)}<small>dB</small></dd></div>`;
+  })();
   if (!s) {
     $('#pdpBlock').hidden = true;
     $('#stats').innerHTML = `<div><dt>BS 到 UE 直線距離</dt><dd>${fmt(d)}<small>m</small></dd></div><div><dt>結果</dt><dd style="font-family:inherit;font-size:14px">沒有穿越 4 面以內的路徑</dd></div>`;
@@ -709,6 +828,7 @@ function renderPanel() {
   }
   $('#pdpBlock').hidden = false;
   $('#stats').innerHTML =
+    mExtra +
     `<div><dt>BS 到 UE 直線距離</dt><dd>${fmt(d)}<small>m</small></dd></div>` +
     `<div><dt>UE 位置</dt><dd style="font-family:inherit;font-size:15px">${r.indoor ? '室內（OSM 建築內）' : '室外'}</dd></div>` +
     (r.omni ? '' : `<div><dt>服務扇區（最強）</dt><dd><span class="sec" style="background:${SEC_COL[r.serve].toCssHexString()}"></span>S${r.serve + 1}${r.sector !== r.serve ? `<small>目前顯示 S${r.sector + 1}</small>` : ''}</dd></div>` +
@@ -747,6 +867,7 @@ function refresh(rebuild) {
   setDispFrame();
   drawSite(); drawBuildings(); drawRays(); renderUEButtons(); renderPanel(); syncUEEdit(); st.hi = null; highlight(null);
   reportDelta();
+  renderV2();
 }
 let toastT;
 function toast(html) { const t = $('#toast'); t.innerHTML = html; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
@@ -761,6 +882,7 @@ function reportDelta() {
   const idx = sel === 'all' ? now.map((_, i) => i) : [sel];
   const lines = [];
   const unit = m => m === 'RSRP' ? ' dBm' : ' dB';
+  if (!isUE(sel) && sel !== 'all') return;
   if (sel !== 'all') {
     const a = prev[sel], b = now[sel];
     if (!a.v || !b.v) return;
@@ -785,7 +907,7 @@ function syncAntUI() {
   document.querySelectorAll('#secSel button').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === st.secSel));
 }
 function syncUEEdit() {
-  const single = st.sel !== 'all';
+  const single = isUE(st.sel);
   $('#ueEdit').hidden = !single;
   if (single) { $('#ueLat').value = SITE.ues[st.sel].lat.toFixed(7); $('#ueLon').value = SITE.ues[st.sel].lon.toFixed(7); }
   $('#uePick').setAttribute('aria-pressed', st.picking != null);
@@ -806,7 +928,7 @@ syncAntUI();
 syncLbNote();
 $('#mlegendBody').innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>` +
   `<div style="margin-top:6px">建築高度來源（點建築可修改）</div><div class="bl">` + Object.values(HSRC).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>' +
-  `<div style="margin-top:6px">UE 圓點：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
+  `<div style="margin-top:6px">UE（大點）與 V2 實測點（小點，✕＝無服務）：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
 // Number fields recalc 0.5 s after typing stops, and only when the value actually changed
 const LIVE_SKIP = new Set(['ueLat', 'ueLon', 'key']);
 document.addEventListener('change', e => {
@@ -837,21 +959,22 @@ function pickUE(pos) {
   setUE(i, Cesium.Math.toDegrees(g.latitude), Cesium.Math.toDegrees(g.longitude));
 }
 $('#uePick').onclick = () => {
-  if (!st.viewer || !st.osm || st.sel === 'all') return;
+  if (!st.viewer || !st.osm || !isUE(st.sel)) return;
   st.picking = st.picking == null ? st.sel : null; syncUEEdit();
   if (st.picking != null) status(`點地圖選 UE ${st.sel + 1} 的新位置。`);
 };
 $('#ueApply').onclick = () => {
   const lat = +$('#ueLat').value, lon = +$('#ueLon').value;
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { status('緯度或經度格式不對。', true); return; }
-  if (st.osm && st.viewer && st.sel !== 'all') setUE(st.sel, lat, lon);
+  if (st.osm && st.viewer && isUE(st.sel)) setUE(st.sel, lat, lon);
 };
-$('#ueReset').onclick = () => { if (st.osm && st.viewer && st.sel !== 'all') setUE(st.sel, ORIG_UES[st.sel].lat, ORIG_UES[st.sel].lon); };
+$('#ueReset').onclick = () => { if (st.osm && st.viewer && isUE(st.sel)) setUE(st.sel, ORIG_UES[st.sel].lat, ORIG_UES[st.sel].lon); };
 
 /* ===== optimizer ===== */
+function optKeys() { return SITE.ues.map((_, i) => i).concat($('#optUseM').checked ? V2.rows.map((_, j) => 'm' + j) : []); }
 function optPrep() {
   const c = lbCfg(), eirp = c.eirpTot;
-  return SITE.ues.map((_, i) => {
+  return optKeys().map(i => {
     const g = geomUE(i);
     return { az: g.paths.map(p => p.az), el: g.paths.map(p => p.el), lin: g.paths.map(p => Math.pow(10, (eirp - p.pl) / 10)) };
   });
@@ -923,14 +1046,15 @@ async function runOpt() {
     `<div><dt>${goalName}</dt><dd>${fmt(val(before), 0)} → ${fmt(val(best), 0)}<small class="${d >= 0 ? 'up' : 'down'}"> ${d >= 0 ? '+' : ''}${fmt(d, 0)}</small></dd></div>` +
     `<div><dt>建議方位角</dt><dd style="font-size:13px">${azs.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div>` +
     `<div><dt>建議下傾角</dt><dd style="font-size:13px">${tilts.map((v, k) => 'S' + (k + 1) + ' ' + v + '°').join('<br>')}</dd></div></dl>`;
-  h += '<div style="overflow-x:auto"><table><tr><th>UE</th><th>RSRP 前→後</th><th>SINR 前→後</th><th>分數</th></tr>' + best.per.map((q, i) => {
-    if (!q) return `<tr><td>UE ${i + 1}</td><td colspan="3" style="font-family:inherit;text-align:left">模型找不到路徑（穿越太多建築），不列入評分</td></tr>`;
+  h += '<div style="overflow-x:auto;max-height:360px;overflow-y:auto"><table><tr><th>位置</th><th>RSRP 前→後</th><th>SINR 前→後</th><th>分數</th></tr>' + best.per.map((q, i) => {
+    const nm = tgtName(optKeys()[i]).replace('實測點 ', '');
+    if (!q) return `<tr><td>${nm}</td><td colspan="3" style="font-family:inherit;text-align:left">模型找不到路徑，不列入評分</td></tr>`;
     const b = before.per[i], dr = q.rsrp - b.rsrp, ds = q.sinr - b.sinr;
-    return `<tr><td>UE ${i + 1}<small>S${b.k + 1} → S${q.k + 1}</small></td><td>${fmt(b.rsrp)} → ${fmt(q.rsrp)}<small class="${dr >= 0 ? 'up' : 'down'}">${dr >= 0 ? '+' : ''}${fmt(dr)} dB</small></td>` +
+    return `<tr><td>${nm}<small>S${b.k + 1} → S${q.k + 1}</small></td><td>${fmt(b.rsrp)} → ${fmt(q.rsrp)}<small class="${dr >= 0 ? 'up' : 'down'}">${dr >= 0 ? '+' : ''}${fmt(dr)} dB</small></td>` +
       `<td>${fmt(b.sinr)} → ${fmt(q.sinr)}<small class="${ds >= 0 ? 'up' : 'down'}">${ds >= 0 ? '+' : ''}${fmt(ds)} dB</small></td><td>${fmt(b.sc, 0)} → ${fmt(q.sc, 0)}</td></tr>`;
   }).join('') + '</table></div>';
   h += `<p class="sub" style="margin-top:10px">分數地圖：橫軸 S1 方位角 0–119°（三扇區每 120° 重複），縱軸共同下傾角 0–${tMax}°（往下越大），白框為最佳點。</p><canvas id="optHeat" width="120" height="${tSteps}"></canvas>`;
-  h += `<p class="sub" style="margin-top:6px">共評估 ${$('#optMode').value === 'indep' ? '超過 ' : ''}${120 * tSteps} 組設定，${Math.round(performance.now() - t0)} ms。結果只針對目前的 ${SITE.ues.length} 個 UE 位置與模型假設。</p>`;
+  h += `<p class="sub" style="margin-top:6px">共評估 ${$('#optMode').value === 'indep' ? '超過 ' : ''}${120 * tSteps} 組設定，${Math.round(performance.now() - t0)} ms。評估 ${optKeys().length} 個位置（${SITE.ues.length} 個 UE${$('#optUseM').checked ? ' + 57 個實測點' : ''}），結果只對應這些位置與模型假設。</p>`;
   $('#optOut').innerHTML = h;
   const cv = $('#optHeat'), cx = cv.getContext('2d'), img = cx.createImageData(120, tSteps);
   let lo = Infinity, hi = -Infinity; heat.forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
@@ -957,6 +1081,73 @@ $('#optApply').onclick = () => {
   toast('已套用最佳設定。');
 };
 
+/* ===== V2 measured comparison ===== */
+function v2Compare() {
+  const c = lbCfg(), off = 10 * Math.log10(c.nre);
+  return V2.rows.map((m, j) => {
+    const key = 'm' + j, r = traceUE(key), g = geomUE(key);
+    const los = g.paths.some(p => p.type === 'los' && !p.pen.length);
+    const k = m[6] != null ? pciSector(m[6]) : -1;
+    const pred = k >= 0 && Number.isFinite(r.prx[k]) ? r.prx[k] - off : null;
+    const best = Number.isFinite(r.prx[r.serve]) ? r.prx[r.serve] - off : null;
+    const tx = txPos(), rx = uePos(key);
+    return { j, id: m[0], meas: m[3], snr: m[5], pci: m[6], flag: m[7], pred, best, serveK: r.serve, k, los, d: Math.hypot(rx[0] - tx[0], rx[2] - tx[2]), omni: r.omni };
+  });
+}
+const mstat = a => { if (!a.length) return null; const m = a.reduce((x, y) => x + y, 0) / a.length; return { n: a.length, mean: m, sd: Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length) }; };
+function renderV2() {
+  if (!st.osm) return;
+  const rows = v2Compare(), ok = rows.filter(r => r.meas != null && r.pred != null);
+  const all = mstat(ok.map(r => r.pred - r.meas)), los = mstat(ok.filter(r => r.los).map(r => r.pred - r.meas)), nlos = mstat(ok.filter(r => !r.los).map(r => r.pred - r.meas));
+  const match = ok.filter(r => !r.omni), mrate = match.length ? match.filter(r => r.serveK === r.k).length / match.length : null;
+  const nosvc = rows.filter(r => r.meas == null), nosvcHi = nosvc.filter(r => r.best != null && r.best > -110);
+  const sv = x => x ? `${x.mean >= 0 ? '+' : ''}${fmt(x.mean)}<small>±${fmt(x.sd)} dB · ${x.n} 點</small>` : '—';
+  let h = `<dl class="v2sum"><div><dt>全部（預測 − 實測）</dt><dd>${sv(all)}</dd></div><div><dt>LOS 點</dt><dd>${sv(los)}</dd></div><div><dt>NLOS 點</dt><dd>${sv(nlos)}</dd></div>` +
+    `<div><dt>服務扇區與實測 PCI 一致</dt><dd>${mrate == null ? '—' : Math.round(mrate * 100) + '%'}</dd></div>` +
+    `<div style="grid-column:span 2"><dt>實測無服務的 ${nosvc.length} 點中，模型預測 &gt; −110 dBm</dt><dd>${nosvcHi.length}<small>點${nosvcHi.length ? '：' + nosvcHi.map(r => 'S' + r.id).join(' ') : ''}</small></dd></div></dl>`;
+  // scatter
+  const W = 360, H = 220, L = 38, R = 8, T = 8, B = 30, lo = -140, hi = -50;
+  const X = v => L + (v - lo) / (hi - lo) * (W - L - R), Y = v => T + (hi - v) / (hi - lo) * (H - T - B), cl = v => Math.max(lo, Math.min(hi, v));
+  let g = '';
+  for (let v = lo; v <= hi; v += 10) g += `<line x1="${X(v)}" x2="${X(v)}" y1="${T}" y2="${H - B}" stroke="#222c37"/><line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#222c37"/>` +
+    (v % 20 === 0 ? `<text x="${X(v)}" y="${H - B + 12}" text-anchor="middle">${v}</text><text x="${L - 4}" y="${Y(v) + 3}" text-anchor="end">${v}</text>` : '');
+  g += `<line x1="${X(lo)}" y1="${Y(lo)}" x2="${X(hi)}" y2="${Y(hi)}" stroke="#93a1af" stroke-dasharray="4 3"/>`;
+  g += `<text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle">實測 RSRP (dBm)</text><text x="${L}" y="${T + 9}" text-anchor="start" dx="4">↑ 預測</text>`;
+  ok.forEach(r => { g += `<circle cx="${X(cl(r.meas))}" cy="${Y(cl(r.pred))}" r="${st.sel === 'm' + r.j ? 5 : 3.5}" fill="${r.los ? '#ffcc4d' : '#5b6cff'}" stroke="#10151b" stroke-width=".8"><title>S${r.id}</title></circle>`; });
+  h += `<svg id="v2Scatter" viewBox="0 0 ${W} ${H}" role="img" aria-label="實測與預測 RSRP 散布圖">${g}</svg><p class="sub">黃點 LOS、藍點 NLOS；虛線為預測 = 實測，點在虛線上方代表模型高估。</p>`;
+  h += '<div style="overflow-x:auto;max-height:360px;overflow-y:auto;margin-top:8px"><table><tr><th>點</th><th>距離</th><th>實測</th><th>預測</th><th>誤差</th></tr>' + rows.map(r => {
+    const e = r.meas != null && r.pred != null ? r.pred - r.meas : null;
+    const meas = r.meas == null ? `<span class="flag">${r.flag === 1 ? '他網' : '無服務'}</span>` : fmt(r.meas, 0) + (r.flag === 2 ? '†' : '');
+    const pred = r.meas == null ? (r.best == null ? '無路徑' : fmt(r.best)) : (r.pred == null ? '—' : fmt(r.pred));
+    return `<tr class="p" data-m="${r.j}"><td>S${r.id}<small>${r.los ? 'LOS' : 'NLOS'}${r.pci != null ? ' · PCI ' + r.pci : ''}${!r.omni && r.meas != null && r.serveK !== r.k ? ' · <span class="flag">扇區不符</span>' : ''}</small></td><td>${fmt(r.d, 0)} m</td><td>${meas}</td><td>${pred}</td><td>${e == null ? '—' : (e > 0 ? '+' : '') + fmt(e)}</td></tr>`;
+  }).join('') + '</table></div>';
+  $('#v2Out').innerHTML = h;
+  st.v2 = { all, los };
+}
+$('#v2Out').addEventListener('click', e => { const tr = e.target.closest('tr[data-m]'); if (!tr || !st.osm) return; st.sel = 'm' + tr.dataset.m; st.picking = null; refresh(false); });
+function calibrate(which) {
+  if (!st.osm) { status('請先載入地圖並計算。', true); return; }
+  const x = which === 'los' ? st.v2 && st.v2.los : st.v2 && st.v2.all;
+  if (!x) { status(which === 'los' ? '目前沒有 LOS 的實測點可以校準。' : '沒有可比對的實測點。', true); return; }
+  const before = +$('#extraL').value || 0, after = Math.round((before + x.mean) * 10) / 10;
+  $('#extraL').value = after; $('#extraL').dataset.last = String(after);
+  syncLbNote(); refresh(false);
+  toast(`額外損耗 ${fmt(before)} → <b>${fmt(after)} dB</b>（依 ${x.n} 個${which === 'los' ? ' LOS ' : ''}實測點，平均誤差歸零）`);
+}
+$('#calLos').onclick = () => calibrate('los');
+$('#calAll').onclick = () => calibrate('all');
+$('#showM').addEventListener('change', () => { if (st.osm) drawSite(); });
+$('#v2Preset').onclick = () => {
+  $('#antMode').value = 'sector'; $('#secLayout').value = 'fixed'; $('#az').value = 30;
+  $('#pci0').value = 13; $('#pci1').value = 15; $('#pci2').value = 14;
+  if (st.osm && bsBuilding >= 0) {
+    const roof = st.list[bsBuilding].h; $('#mast').value = Math.max(0, Math.round((13 - roof) * 10) / 10);
+  } else $('#mast').value = 4;
+  st.cache = {}; syncAntUI(); if (st.osm) refresh(false);
+  toast(`已套用：天線離地 13 m（樓頂上 ${$('#mast').value} m），方位 30° / 150° / 270°，PCI 13 / 15 / 14。`);
+};
+['#pci0', '#pci1', '#pci2'].forEach(sel => $(sel).addEventListener('change', () => { if (st.osm) refresh(false); }));
+
 /* ===== events ===== */
 $('#ues').addEventListener('click', e => { const b = e.target.closest('[data-u]'); if (!b || !st.osm) return; st.sel = b.dataset.u === 'all' ? 'all' : +b.dataset.u; st.picking = null; refresh(false); });
 $('#tbl').addEventListener('pointerover', e => { const tr = e.target.closest('tr.p[data-i]'); if (tr && st.hi == null) highlight(+tr.dataset.i); });
@@ -967,7 +1158,7 @@ $('#tbl').addEventListener('click', e => {
   const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
 });
 ['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
-['#eirp', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
+['#ruP', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
 $('#bsH').addEventListener('change', () => {
@@ -988,7 +1179,7 @@ $('#dlB').onclick = () => { if (st.osm) download('buildings_osm.json', { attribu
 $('#dlR').onclick = () => {
   if (!st.osm) return;
   const lc = lbCfg();
-  const out = { frequency_MHz: +$('#fMHz').value, bandwidth_MHz: lc.bw, scs_kHz: lc.scs, n_rb: lc.nrb, eirp_dBm_per_10MHz: +$('#eirp').value, eirp_total_dBm: +lc.eirpTot.toFixed(2), noise_dBm: +lc.noise.toFixed(2), h0_ellipsoid_m: st.h0,
+  const out = { frequency_MHz: +$('#fMHz').value, bandwidth_MHz: lc.bw, scs_kHz: lc.scs, n_rb: lc.nrb, ru_power_dBm: +$('#ruP').value, antenna_gain_dBi: +$('#antG').value, cable_loss_dB: +$('#cableL').value, sas_max_eirp_dBm_per_MHz: +$('#sasE').value, extra_loss_dB: +$('#extraL').value, eirp_total_dBm: +lc.eirpTot.toFixed(2), noise_dBm: +lc.noise.toFixed(2), h0_ellipsoid_m: st.h0,
     bs: { lat: SITE.bs.lat, lon: SITE.bs.lon, antenna_agl_m: txPos()[1], antenna: antCfg() }, ues: SITE.ues.map((u, i) => {
       const r = traceUE(i);
       const lk = link(r);
@@ -1055,6 +1246,7 @@ async function createViewer(mode, key) {
     if (st.picking != null) { pickUE(m.position); return; }
     const p = viewer.scene.pick(m.position);
     if (p && p.id && p.id.ueIndex != null) { st.sel = p.id.ueIndex; refresh(false); return; }
+    if (p && p.id && p.id.mIndex != null) { st.sel = 'm' + p.id.mIndex; st.picking = null; refresh(false); return; }
     if (p && p.id && p.id.bIndex != null && st.list) openBSheet(p.id.bIndex);
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
   initFrames();
