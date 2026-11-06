@@ -120,7 +120,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel">
     <div>
       <h1>CBRS 站點多徑射線</h1>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-06 23:50</p>
     </div>
 
     <section class="block">
@@ -536,23 +536,39 @@ function centerAndRadius() {
 }
 async function fetchOSM() {
   const { lat, lon, r } = centerAndRadius();
-  const q = `[out:json][timeout:40];(way["building"](around:${r},${lat},${lon});relation["building"](around:${r},${lat},${lon}););out tags geom;`;
-  try {
-    const c = JSON.parse(localStorage.getItem('alaskaOSM') || 'null');
-    if (c && c.q === q && Date.now() - c.t < 7 * 864e5) return c.data;
-  } catch (e) {}
-  const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+  const q = `[out:json][timeout:60];(way["building"](around:${r},${lat},${lon});relation["building"](around:${r},${lat},${lon}););out tags geom;`;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem('alaskaOSM') || 'null'); } catch (e) {}
+  st.osmNote = '';
+  if (cached && cached.q === q && Date.now() - cached.t < 7 * 864e5) return cached.data;
+  const eps = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
   let lastErr;
-  for (const ep of eps) {
-    try {
-      const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-      if (!res.ok) throw new Error(ep + ' 回應 ' + res.status);
-      const data = await res.json();
-      try { localStorage.setItem('alaskaOSM', JSON.stringify({ q, t: Date.now(), data })); } catch (e) {}
-      return data;
-    } catch (e) { lastErr = e; }
+  for (let round = 0; round < 2; round++) {
+    for (const ep of eps) {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
+      try {
+        status(`從 OpenStreetMap 抓取建築（${new URL(ep).hostname}${round ? '，重試' : ''}）…`);
+        const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
+        if (!res.ok) throw new Error(new URL(ep).hostname + ' 回應 ' + res.status);
+        const data = await res.json();
+        if (!data.elements || !data.elements.length) throw new Error(new URL(ep).hostname + ' 回傳空資料');
+        try { localStorage.setItem('alaskaOSM', JSON.stringify({ q, t: Date.now(), data })); } catch (e) {}
+        return data;
+      } catch (e) { lastErr = e; } finally { clearTimeout(timer); }
+    }
+    if (round === 0) await new Promise(r => setTimeout(r, 4000));
   }
-  throw lastErr;
+  // fallbacks: an older cached download, then the building outlines bundled with the site
+  if (cached && cached.data) { st.osmNote = 'OSM 伺服器暫時連不上，改用上次抓到的建築資料。'; return cached.data; }
+  try {
+    const res = await fetch('buildings_kmz.json');
+    if (res.ok) {
+      const polys = await res.json();
+      st.osmNote = 'OSM 伺服器暫時連不上，改用路測 KMZ 內附的建築輪廓（沒有高度資料，全部用預設高度）。';
+      return { elements: polys.map((poly, i) => ({ type: 'way', id: 'kmz' + i, tags: {}, geometry: poly.map(([lo, la]) => ({ lat: la, lon: lo })) })) };
+    }
+  } catch (e) {}
+  throw new Error('OpenStreetMap 連線失敗：' + (lastErr && lastErr.message || lastErr));
 }
 function heightOf(t) {
   const p = s => { if (!s) return NaN; const ft = /'|ft/i.test(s); const v = parseFloat(s); return ft ? v * 0.3048 : v; };
@@ -1288,12 +1304,12 @@ $('#go').onclick = async () => {
     const t0 = performance.now();
     refresh(true);
     const noH = st.list.filter(b => b.src === 'default').length;
-    status(`完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
+    status((st.osmNote ? st.osmNote + '\n' : '') + `完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
       (bsBuilding < 0 ? '\n注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。' : ''));
   } catch (e) {
     console.error(e);
     const m = String(e && e.message || e);
-    status(/overpass|Failed to fetch|NetworkError/i.test(m) ? 'OpenStreetMap 建築資料抓取失敗，請稍後重試，或用「改用本機建築 JSON」：' + m
+    status(/OpenStreetMap|overpass|Failed to fetch|NetworkError|Load failed|abort/i.test(m) ? 'OpenStreetMap 建築資料抓取失敗（伺服器忙碌或連線逾時），請過幾分鐘再按一次：' + m
       : /403|401|key|token|Unauthorized|asset/i.test(m) ? (mode === 'ion' ? 'Cesium ion token 無效，或你的帳號沒有 Google 寫實 3D 這個 asset：' : '金鑰無效，或這個專案還沒啟用 Map Tiles API：') + m
       : '發生錯誤：' + m, true);
   } finally { $('#go').disabled = false; }
