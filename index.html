@@ -1220,7 +1220,13 @@ $('#dlR').onclick = () => {
 $('#upBtn').onclick = () => $('#upB').click();
 $('#upB').onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const j = JSON.parse(await f.text()); st.osm = j.buildings || parseOSM(j); status(`已載入本機建築資料：${st.osm.length} 棟。`); if (st.viewer) refresh(true); }
+  try {
+    const j = JSON.parse(await f.text()); st.osm = j.buildings || parseOSM(j);
+    const ov = j.height_overrides_m ? Object.keys(j.height_overrides_m).length : 0;
+    if (ov) { Object.assign(st.hOv, j.height_overrides_m); saveOv(); }
+    status(`已載入本機建築資料：${st.osm.length} 棟${ov ? `，並還原 ${ov} 筆你設定的高度` : ''}。` + (st.viewer ? '' : '請按「載入地圖並計算」。'));
+    if (st.viewer) refresh(true);
+  }
   catch (err) { status('這個檔案不是建築 JSON：' + err.message, true); }
 };
 
