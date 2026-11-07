@@ -51,8 +51,10 @@ html,body{overflow-x:hidden}
 .phead{padding:14px 18px 6px;display:flex;flex-direction:column;gap:4px}
 .phead .trow{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .tabs{display:flex;border-bottom:1px solid var(--line);padding:0 10px;flex:none}
-.tabs button{flex:1;border:0;border-radius:0;background:transparent;color:var(--muted);padding:10px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:13px;border-bottom:3px solid transparent;min-width:0}
-.tabs button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+.tabs button{flex:1;border:0;border-radius:0;background:transparent;color:#b5c0cb;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:13px;border-bottom:3px solid transparent;min-width:0}
+.tabs .ic{display:flex;align-items:center;justify-content:center;padding:3px 12px;border-radius:14px}
+.tabs button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-pressed=true] .ic{background:rgba(255,179,71,.18)}
 .tabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent);background:transparent;font-weight:700}
 .tabs button:hover{border-color:transparent;color:var(--fg)}
 .tabs button[aria-pressed=true]:hover{border-bottom-color:var(--accent);color:var(--accent)}
@@ -105,8 +107,11 @@ html,body{overflow-x:hidden}
   .panel.compact .ues button{min-height:38px;height:38px;min-width:38px}
   .pbody{padding:6px 14px 16px;border-top:1px solid var(--line)}
   .tabs{order:10;border-bottom:0;border-top:1px solid var(--line);padding:0 0 env(safe-area-inset-bottom,0px)}
-  .tabs button{border-bottom:0;border-top:3px solid transparent;min-height:54px;font-size:11px}
-  .tabs button[aria-pressed=true]{border-top-color:var(--accent)}
+  .tabs{padding:4px 2px env(safe-area-inset-bottom,0px)}
+  .tabs button{border-bottom:0;min-height:68px;padding:6px 0 8px;font-size:13px;font-weight:600;gap:4px}
+  .tabs .ic{padding:4px 18px;border-radius:16px}
+  .tabs button svg{width:27px;height:27px}
+  .tabs button[aria-pressed=true]{border-bottom:0}
   #mapbar{left:10px;right:10px;top:calc(10px + env(safe-area-inset-top,0px))}
   #mapbar .mtitle{display:flex;align-items:center;flex:1;min-width:0;min-height:44px;padding:0 12px;background:rgba(16,21,27,.92);border:1px solid var(--line);border-radius:10px;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden}
   #mapbar .langm{display:flex;width:auto;background:rgba(16,21,27,.92)}
@@ -220,14 +225,14 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
     <div class="phead">
       <div class="trow"><h1>CBRS 站點多徑射線</h1>
         <div class="seg" role="group" aria-label="Language" style="width:auto;flex:none"><button type="button" data-lang="zh" aria-pressed="true">中文</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div></div>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 08:10</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 08:20</p>
     </div>
     <nav class="tabs" id="tabs" aria-label="面板分頁">
-      <button type="button" data-tab="set" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg><span>設定</span></button>
-      <button type="button" data-tab="ant" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V9"></path><path d="M7 4l5 5 5-5"></path><path d="M4 8a10 10 0 0 1 16 0"></path></svg><span>天線</span></button>
-      <button type="button" data-tab="res" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg><span>結果</span></button>
-      <button type="button" data-tab="v2" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="17" r="2"></circle><circle cx="12" cy="9" r="2"></circle><circle cx="18" cy="14" r="2"></circle><path d="M3 21h18"></path></svg><span>實測</span></button>
-      <button type="button" data-tab="opt" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"></path><circle cx="12" cy="12" r="4"></circle></svg><span>最佳化</span></button>
+      <button type="button" data-tab="set" aria-pressed="true"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11M18 6h3M3 12h5M12 12h9M3 18h13M20 18h1"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg></i><span>設定</span></button>
+      <button type="button" data-tab="ant" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="1.6"></circle><path d="M12 10L8 21M12 10l4 11M9.3 17.2h5.4"></path><path d="M8.6 4.8a4.6 4.6 0 0 0 0 6.4M15.4 4.8a4.6 4.6 0 0 1 0 6.4M5.7 2.6a8.4 8.4 0 0 0 0 10.8M18.3 2.6a8.4 8.4 0 0 1 0 10.8"></path></svg></i><span>天線</span></button>
+      <button type="button" data-tab="res" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-width="3" d="M4.5 20.5v-3.5M9.5 20.5v-7.5M14.5 20.5v-11.5M19.5 20.5v-16"></path></svg></i><span>結果</span></button>
+      <button type="button" data-tab="v2" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"></path><path d="M9.3 10.4l1.9 1.9 3.6-3.7"></path></svg></i><span>實測</span></button>
+      <button type="button" data-tab="opt" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5L14 10"></path><path d="M12.6 8.6l2.8 2.8"></path><path d="M18 2.5v5M15.5 5h5M7.5 3v3M6 4.5h3M19.5 13v3M18 14.5h3"></path></svg></i><span>最佳化</span></button>
     </nav>
     <div class="sumbar">
       <div class="ues" id="ues"></div>
