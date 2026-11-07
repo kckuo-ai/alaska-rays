@@ -1,0 +1,17 @@
+  downloaded 20150510_AK_Anchorage_2015_63436785.copc.laz 31.7 MB in 1 s
+CRS: EPSG:6334
+20150510_AK_Anchorage_2015_63436785.copc.laz: 2,994,170 points in area, 1,273,638 ground
+  downloaded 20150510_AK_Anchorage_2015_63446784.copc.laz 28.3 MB in 1 s
+20150510_AK_Anchorage_2015_63446784.copc.laz: 3,902,369 points in area, 2,018,373 ground
+  downloaded 20150510_AK_Anchorage_2015_63446785.copc.laz 31.0 MB in 1 s
+20150510_AK_Anchorage_2015_63446785.copc.laz: 5,325,441 points in area, 2,622,523 ground
+  downloaded 20150510_AK_Anchorage_2015_63446786.copc.laz 32.2 MB in 1 s
+20150510_AK_Anchorage_2015_63446786.copc.laz: 4,122,665 points in area, 1,936,758 ground
+  downloaded 20150510_AK_Anchorage_2015_63456784.copc.laz 31.2 MB in 1 s
+20150510_AK_Anchorage_2015_63456784.copc.laz: 4,374,992 points in area, 1,903,257 ground
+  downloaded 20150510_AK_Anchorage_2015_63456785.copc.laz 32.2 MB in 1 s
+20150510_AK_Anchorage_2015_63456785.copc.laz: 5,467,784 points in area, 2,466,434 ground
+  downloaded 20150510_AK_Anchorage_2015_63456786.copc.laz 29.8 MB in 1 s
+20150510_AK_Anchorage_2015_63456786.copc.laz: 3,404,029 points in area, 1,691,743 ground
+cells with surface 73.9%, with ground 56.6%; 29,591,450 points
+stats {"count": 1345, "flat": 7, "skipped_no_data": 100, "p10": 4.2, "p25": 5.0, "median": 5.9, "p75": 7.8, "p90": 9.8, "max": 39.9}
