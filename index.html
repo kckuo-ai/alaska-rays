@@ -64,6 +64,7 @@ html,body{overflow-x:hidden}
 .kpi .k{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi .v{font:500 19px var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .kpi .s{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appverline{text-align:center;margin:4px 0 0}
 .hgrad{height:10px;border-radius:2px;margin:4px 0 2px}
 .hticks{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted)}
 #heatOnly{margin-top:2px}
@@ -233,7 +234,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
     <div class="phead">
       <div class="trow"><h1>CBRS 站點多徑射線</h1>
         <div class="seg" role="group" aria-label="Language" style="width:auto;flex:none"><button type="button" data-lang="zh" aria-pressed="true">中文</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div></div>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br>版本 2026-11-07 08:40</p>
+      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br><span class="appver"></span></p>
     </div>
     <nav class="tabs" id="tabs" aria-label="面板分頁">
       <button type="button" data-tab="set" aria-pressed="true"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11M18 6h3M3 12h5M12 12h9M3 18h13M20 18h1"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg></i><span>設定</span></button>
@@ -481,6 +482,8 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
     </section>
+
+    <p class="sub appverline" data-tab="set"><span class="appver"></span> · <a href="https://github.com/kckuo-ai/alaska-rays" target="_blank" rel="noopener">GitHub</a></p>
       </div>
   </aside>
 </div>
@@ -1841,6 +1844,8 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
+const APP_VERSION = '2026-11-07 08:50';
+document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 const isPhone = () => window.matchMedia('(max-width:699px)').matches;
 let curTab = 'set';
 function setTab(t, noExpand) {
