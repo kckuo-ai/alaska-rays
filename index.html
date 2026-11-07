@@ -249,6 +249,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <label class="chk"><input type="checkbox" id="ghost" checked>顯示被擋住的射線段</label>
         <label class="chk"><input type="checkbox" id="showM" checked>在地圖上顯示實測點</label>
         <label class="chk"><input type="checkbox" id="showH" checked>顯示覆蓋熱力圖</label>
+        <label class="chk" id="showCWrap" hidden><input type="checkbox" id="showC">顯示樹冠（光達）</label>
         <label class="chk"><input type="checkbox" id="showU" checked>顯示 UE</label>
         <label class="chk"><input type="checkbox" id="showR" checked>顯示射線</label>
         <button type="button" id="heatOnly">只看熱力圖</button>
@@ -384,6 +385,11 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <label class="chk"><input type="checkbox" id="order2" checked>計算二次反射</label>
         <label class="chk"><input type="checkbox" id="diffOn" checked>屋頂繞射</label>
       </div>
+      <div class="row2" id="vegRow" style="margin-top:10px" hidden>
+        <label class="chk" style="align-self:end"><input type="checkbox" id="vegOn">植被衰減（樹冠，試作）</label>
+        <label class="f">樹葉狀態<select id="leaf"><option value="1">有葉（夏季）</option><option value="0.5">無葉（落葉樹，衰減 × 0.5）</option></select></label>
+      </div>
+      <p class="sub" id="vegNote" style="margin-top:6px" hidden></p>
       <div class="tools" id="calTools" style="margin-top:10px">
         <button type="button" id="calLos">用 LOS 路測點校準額外損耗</button>
         <button type="button" id="calAll">用全部路測點校準</button>
@@ -589,6 +595,28 @@ const RT = (() => {
       if (fn(t, x, ground(x, z), a[1] + (b[1] - a[1]) * t, D) === false) return;
     }
   }
+  // vegetation: canopy height above ground on a regular grid (null = none). Trees attenuate (Weissberger),
+  // they are not treated as specular reflectors; the canopy top also competes as a diffraction edge.
+  let CAN = null;
+  function setCanopy(c) { CAN = c && c.h && c.nx > 1 ? c : null; }
+  function canopyAt(x, z) {
+    if (!CAN) return 0;
+    const i = Math.round((x - CAN.x0) / CAN.step), j = Math.round((z - CAN.z0) / CAN.step);
+    return i < 0 || j < 0 || i >= CAN.nx || j >= CAN.nz ? 0 : CAN.h[j * CAN.nx + i];
+  }
+  function vegDepth(a, b) {
+    const H = Math.hypot(b[0] - a[0], b[2] - a[2]), D3 = Math.hypot(H, b[1] - a[1]), n = Math.max(2, Math.ceil(H / (CAN.step * 0.75)));
+    let inside = 0;
+    for (let k = 0; k < n; k++) {
+      const t = (k + .5) / n, x = a[0] + (b[0] - a[0]) * t, z = a[2] + (b[2] - a[2]) * t, c = canopyAt(x, z);
+      if (c <= 0) continue;
+      const y = a[1] + (b[1] - a[1]) * t, g = ground(x, z);
+      if (y < g + c && y > g + Math.max(2, 0.3 * c)) inside++;   // crown layer only: trunks and the space under the crown don't count
+    }
+    return inside / n * D3;
+  }
+  // Weissberger modified exponential decay (d in m, f in GHz), capped at 400 m of foliage
+  const vegLoss = (d, fG) => d <= 0 ? 0 : d <= 14 ? 0.45 * Math.pow(fG, 0.284) * d : 1.33 * Math.pow(fG, 0.284) * Math.pow(Math.min(d, 400), 0.588);
   function terrBlocked(a, b) { if (!TER) return false; let blk = false; terrProfile(a, b, (t, x, g, y) => { if (g > y + 0.2) { blk = true; return false; } }); return blk; }
   const CELL = 40; let grid = new Map(), gx0 = 0, gz0 = 0, stamp = new Int32Array(0), stampN = 0;
   const area = p => { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return a / 2; };
@@ -703,13 +731,14 @@ const RT = (() => {
   }
   function trace(tx, rx, o) {
     const C = 299792458, lam = C / o.fHz, paths = [];
-    const useT = !!TER && o.terrain !== false;
+    const useT = !!TER && o.terrain !== false, useV = !!CAN && o.veg !== false;
     GF.g = useT ? ground(rx[0], rx[2]) : 0;   // ground reflection off the local ground level at the UE
     const add = (pts, type, via) => {
       const pen = [];
       for (let k = 1; k < pts.length; k++) { for (const c of crossings(pts[k - 1], pts[k], o.maxPen)) pen.push(c); if (pen.length > o.maxPen) return; }
       if (useT) for (let k = 1; k < pts.length; k++) if (terrBlocked(pts[k - 1], pts[k])) return;   // no path through the ground
-      paths.push({ pts, type, via, pen });
+      let veg = 0; if (useV) for (let k = 1; k < pts.length; k++) veg += vegDepth(pts[k - 1], pts[k]);
+      paths.push({ pts, type, via, pen, veg });
     };
     add([tx, rx], 'los', []);
     if (o.diff) {
@@ -723,6 +752,13 @@ const RT = (() => {
         if (!best || v > best.v) best = { v, p: [x, h, z], terr: h === undefined };
       };
       for (const c of cr) cand(c.t, c.p[0], B[c.b].h, c.p[2], tx[1] + (rx[1] - tx[1]) * c.t);
+      if (useV && vegDepth(tx, rx) > 2) {   // direct path goes through trees: the canopy top is a candidate edge too
+        const n = Math.max(2, Math.ceil(D / (CAN.step * 0.75)));
+        for (let k = 1; k < n; k++) {
+          const t = k / n, x = tx[0] + (rx[0] - tx[0]) * t, z = tx[2] + (rx[2] - tx[2]) * t, c = canopyAt(x, z);
+          if (c > 0) { const b0 = best; cand(t, x, ground(x, z) + c, z, tx[1] + (rx[1] - tx[1]) * t); if (best !== b0) best.terr = false; }
+        }
+      }
       if (useT && (cr.length || tBlk)) terrProfile(tx, rx, (t, x, g, y) => { const z = tx[2] + (rx[2] - tx[2]) * t; const b0 = best; cand(t, x, g, z, y); if (best !== b0) best.terr = true; });
       if (best && best.v > -0.78) {
         const J = 6.9 + 20 * Math.log10(Math.sqrt((best.v - 0.1) ** 2 + 1) + best.v - 0.1);
@@ -752,6 +788,7 @@ const RT = (() => {
       for (const f of p.via) pl += f.kind === 'ground' ? o.reflG : o.reflW;
       for (const c of p.pen) pl += c.kind === 'roof' ? o.penR : o.penW;
       if (p.dl) pl += p.dl;
+      if (p.veg > 0.5) { p.vl = vegLoss(p.veg, o.fHz / 1e9) * (o.vegK ?? 1); pl += p.vl; } else p.vl = 0;
       p.pl = pl;
     }
     for (const p of paths) {
@@ -761,7 +798,7 @@ const RT = (() => {
     }
     return { paths, total: paths.length };
   }
-  return { setBuildings, setTerrain, ground, terrBlocked, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
+  return { setBuildings, setTerrain, setCanopy, canopyAt, ground, terrBlocked, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
 })();
 </script>
 
@@ -779,7 +816,7 @@ const SITES = {
     ].map(([lat, lon]) => ({ lat, lon })),
     v2scen: 'car',
     defaults: { defH: 6 },   // lidar median 5.9 m for buildings the survey didn't measure
-    bsrc: ['osmb', 'kmz', 'osm'], files: { osmb: 'buildings_osm.json', kmz: 'buildings_kmz.json', lidar: 'lidar/heights_anchorage.json' }, osmbDate: '2026-11-06',
+    bsrc: ['osmb', 'kmz', 'osm'], files: { osmb: 'buildings_osm.json', kmz: 'buildings_kmz.json', lidar: 'lidar/heights_anchorage.json', canopy: 'lidar/canopy_anchorage.json' }, osmbDate: '2026-11-06',
     v2: { tower: [61.1728742, -149.88421488], utc: "2026-11-04", rows: [[38,61.1720903,-149.8844744,-99,-11,17,15,0],[39,61.1709414,-149.8844269,-106,-11,9,15,0],[40,61.1706616,-149.8832569,-112,-11,11,15,0],[41,61.1699155,-149.8830957,-119,-12,2,15,0],[42,61.1691207,-149.8821148,-119,-12,5,15,0],[43,61.1680679,-149.8815798,-126,-14,5,15,0],[44,61.1672085,-149.8811563,-127,-15,0,15,0],[45,61.1667477,-149.8805588,null,null,null,null,0],[46,61.1665482,-149.8806022,null,null,null,null,0],[47,61.1665937,-149.8834488,null,null,null,null,0],[48,61.1674583,-149.886345,null,null,null,null,0],[49,61.1695553,-149.886265,-106,-11,5,15,0],[50,61.1725342,-149.8862741,-104,-17,-3,15,0],[51,61.173332,-149.8863359,-101,-11,14,14,0],[52,61.1736887,-149.888122,-96,-11,21,14,0],[53,61.1736797,-149.8959425,-124,-14,1,14,0],[54,61.1740745,-149.897883,-122,-13,3,14,0],[55,61.1776181,-149.8979025,-128,-15,-4,14,0],[56,61.1793577,-149.8978881,null,null,null,null,0],[57,61.1806851,-149.8954412,null,null,null,null,0],[58,61.1806626,-149.8904118,null,null,null,null,0],[59,61.1798431,-149.8865554,null,null,null,null,0],[60,61.1784078,-149.8865239,-129,-17,-6,14,0],[61,61.1764676,-149.8865006,-129,-18,-7,14,0],[62,61.17485,-149.8864259,-110,-11,12,14,0],[63,61.1739195,-149.8864099,-90,-11,22,14,0],[64,61.1735454,-149.8853869,-98,-11,19,14,2],[65,61.1735464,-149.8827531,-100,-11,23,13,0],[66,61.17355,-149.8800515,-106,-11,14,13,0],[67,61.1735427,-149.8757785,-125,-14,1,13,0],[68,61.1735337,-149.8707143,null,null,null,null,0],[69,61.1694855,-149.8682557,null,null,null,null,0],[70,61.1669182,-149.8682296,null,null,null,null,1],[71,61.1664797,-149.8685392,null,null,null,null,1],[72,61.166531,-149.8770578,null,null,null,null,1],[73,61.166504,-149.8798525,null,null,null,null,0],[74,61.1689889,-149.8819143,-121,-12,4,15,0],[75,61.1722469,-149.883019,-104,-13,2,15,0],[76,61.1730742,-149.8827681,null,null,null,null,0],[77,61.1730725,-149.8825892,-98,-11,20,13,0],[78,61.1730745,-149.8821971,-100,-11,9,13,0],[79,61.1730675,-149.8813284,-105,-11,14,13,0],[80,61.1730692,-149.8802258,-111,-11,10,13,0],[81,61.1730687,-149.8792339,-113,-11,9,13,0],[82,61.1734858,-149.8789338,-107,-11,16,13,0],[83,61.1741597,-149.8789363,-115,-12,5,13,0],[84,61.1753023,-149.878938,-120,-12,4,13,0],[85,61.1765661,-149.8789464,-121,-12,5,13,0],[86,61.1771691,-149.8789436,null,null,null,null,0],[87,61.1772325,-149.8830126,-124,-14,2,13,0],[88,61.1767915,-149.8831544,-123,-13,1,13,0],[89,61.175969,-149.8831334,-120,-13,5,13,0],[90,61.1747627,-149.8831234,-113,-12,4,13,0],[91,61.1739158,-149.8831078,-108,-11,7,13,0],[92,61.1736246,-149.8839572,-99,-11,12,13,0],[93,61.1732053,-149.8843833,-100,-13,4,14,0],[94,61.1728113,-149.8845061,-107,-16,0,14,0]] }
   },
   kaohsiung: {
@@ -973,6 +1010,7 @@ function buildModel() {
     return { h: ov != null ? ov : lh ? lh[0] : (b.h ?? defH), src: ov != null ? 'user' : lh ? 'lidar' : b.src, poly: b.ll.map(([lon, lat]) => toLocal(lon, lat)) };
   });
   RT.setTerrain(terrOn() && demFresh() ? st.dem : null);
+  RT.setCanopy(canopyGrid());
   RT.setBuildings(list, r + 300);
   const bi = RT.buildingAt(0, 0);
   bsBuilding = bi >= 0 ? RT.building(bi).src : -1;
@@ -995,7 +1033,7 @@ const isUE = k => typeof k === 'number';
 const tgtName = k => isUE(k) ? 'UE ' + (k + 1) : k[0] === 'g' ? '格點 ' + (+k.slice(1) + 1) : '實測點 S' + V2.rows[+k.slice(1)][0];
 const pciSector = pci => { const a = antCfg(); if (a.mode === 'omni') return 0; const k = [0, 1, 2].find(k => +$('#pci' + k).value === pci); return k == null ? -1 : k; };
 function opts() {
-  return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, diff: $('#diffOn').checked, terrain: $('#terrOn').checked, relCut: REL_CUT };
+  return { fHz: (+$('#fMHz').value || 3625) * 1e6, reflW: 6, reflG: 3, penW: 15, penR: 20, maxPen: 4, maxOrder: $('#order2').checked ? 2 : 1, diff: $('#diffOn').checked, terrain: $('#terrOn').checked, veg: $('#vegOn').checked && !!st.canopy, vegK: +$('#leaf').value || 1, relCut: REL_CUT };
 }
 function geomUE(i) {
   if (!st.cache[i]) {
@@ -1038,13 +1076,14 @@ function traceUE(i) {
   return out;
 }
 function describe(p) {
-  if (p.type === 'diff') return { label: '屋頂繞射', detail: `繞射損耗 ${fmt(p.dl)} dB` };
+  if (p.type === 'diff') return { label: p.terr ? '山脊繞射' : '屋頂繞射', detail: `繞射損耗 ${fmt(p.dl)} dB` };
   const base = { los: '直射', r1: '一次反射', r2: '二次反射' }[p.type];
   const pen = p.pen.length;
   const label = p.type === 'los' && !pen ? '直射 LOS' : base + (pen ? '＋穿透' : '');
   const parts = [];
   if (p.via.length) parts.push(p.via.map(f => f.kind === 'ground' ? '地面' : '牆面').join(' → '));
   if (pen) parts.push(`穿越 ${pen} 面（${p.pen.filter(c => c.kind === 'wall').length} 牆 ${p.pen.filter(c => c.kind === 'roof').length} 頂）`);
+  if (p.vl > 0.05) parts.push(`穿過樹冠 ${fmt(p.veg, 0)} m（${fmt(p.vl)} dB）`);
   return { label, detail: parts.join('；') || '無遮擋' };
 }
 function stats(kept, key) {
@@ -1866,7 +1905,7 @@ function syncSums() {
     (HAS_V2 ? `路測 ${V2.rows.length} 點` : '路測未匯入'));
   const lc = lbCfg();
   T('secDevSum', `${$('#band').value} · ${$('#fMHz').value} MHz · ${lc.bw} MHz／${lc.scs} kHz · ${lc.nrb} RB · RU ${$('#ruP').value} dBm × ${$('#nPort').value} · 天線 ${$('#antG').value} dBi`);
-  { const p = extraParts(); T('secModelSum', `反射${$('#order2').checked ? '（含二次）' : ''}＋穿透${$('#diffOn').checked ? '＋繞射' : ''}${terrOn() ? '＋地形' : ''} · 額外損耗 ${fmt(p.dev + p.sc + p.adj)} dB（${(SCEN[$('#scen').value] || SCEN.hand).zh}${p.adj ? '，含校準修正 ' + fmt(p.adj) : ''}）`); }
+  { const p = extraParts(); T('secModelSum', `反射${$('#order2').checked ? '（含二次）' : ''}＋穿透${$('#diffOn').checked ? '＋繞射' : ''}${terrOn() ? '＋地形' : ''}${st.canopy && $('#vegOn').checked ? '＋植被' : ''} · 額外損耗 ${fmt(p.dev + p.sc + p.adj)} dB（${(SCEN[$('#scen').value] || SCEN.hand).zh}${p.adj ? '，含校準修正 ' + fmt(p.adj) : ''}）`); }
 }
 document.querySelectorAll('.block.coll .ctog').forEach(b => b.addEventListener('click', () => {
   const sec = b.closest('.block'), closed = !sec.classList.contains('closed');
@@ -1971,6 +2010,66 @@ $('#useLidar').addEventListener('change', () => {
   status(($('#useLidar').checked ? '已改用光達建築高度。' : '已改回 OSM 標籤與預設高度。') + (hadHeat ? '熱力圖已清除，請重新計算。' : ''));
 });
 
+/* ===== vegetation: canopy height grid (from lidar), Weissberger attenuation ===== */
+async function ensureCanopy() {
+  if (!SITE.files.canopy || st.canopy !== undefined) return;
+  try {
+    const meta = await (await fetch(SITE.files.canopy + '?v=' + encodeURIComponent(APP_VERSION))).json();
+    const base = SITE.files.canopy.replace(/[^/]*$/, '');
+    const buf = await (await fetch(base + meta.file + '?v=' + encodeURIComponent(APP_VERSION))).arrayBuffer();
+    if (typeof DecompressionStream === 'undefined') throw new Error('這個瀏覽器不支援解壓縮');
+    const raw = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    if (raw.length !== meta.nx * meta.nz) throw new Error('樹冠格網大小不符');
+    const h = new Float32Array(raw.length); for (let i = 0; i < raw.length; i++) h[i] = raw[i] * meta.scale;
+    st.canopy = { meta, h };
+  } catch (e) { console.warn(e); st.canopy = null; st.canopyErr = (e && e.message) || String(e); }
+  syncVeg();
+}
+// the grid is stored around a fixed reference point; shift it into the frame of the current BS
+function canopyGrid() {
+  if (!st.canopy || !$('#vegOn').checked) return null;
+  const m = st.canopy.meta, mLat = 111320, mLon = 111320 * Math.cos(SITE.bs.lat * Math.PI / 180);
+  const dx = (m.ref.lon - SITE.bs.lon) * mLon, dz = (m.ref.lat - SITE.bs.lat) * mLat;
+  return { x0: m.x0 + dx, z0: m.z0 + dz, step: m.step, nx: m.nx, nz: m.nz, h: st.canopy.h };
+}
+function syncVeg() {
+  const has = !!SITE.files.canopy;
+  $('#vegRow').hidden = !has; $('#vegNote').hidden = !has; $('#showCWrap').hidden = !(has && st.canopy);
+  if (!has) return;
+  if (st.canopy === undefined) { $('#vegNote').textContent = '樹冠高度格網會在載入地圖時讀取（光達）。'; return; }
+  if (!st.canopy) { $('#vegNote').textContent = `樹冠資料讀取失敗（${st.canopyErr}），不計植被衰減。`; return; }
+  const sx = st.canopy.meta.stats;
+  $('#vegNote').textContent = `樹冠來自 NOAA 2015 光達（2 m 格網）：樹冠覆蓋 ${fmt(sx.tree_fraction * 100, 0)}% 的範圍，樹高中位數 ${fmt(sx.median_h)} m。路徑穿過樹冠層時依穿越長度加 Weissberger 衰減（約 10 m 7 dB、20 m 12 dB），樹冠頂也當成繞射邊緣比較；樹不當反射面。用 V2 路測驗證：LOS 偏差只少約 1 dB，NLOS 卻更悲觀 3–4 dB，整體離散度變大，所以預設關閉。`;
+}
+['#vegOn', '#leaf'].forEach(sel => $(sel).addEventListener('change', () => {
+  if (!st.osm || !st.viewer) return;
+  const hadHeat = !!st.heat;
+  st.cache = {}; st.heat = null; st.heatVals = null; st.snap = null; st.base = null;
+  refresh(true); syncSums();
+  status(($('#vegOn').checked ? `植被衰減已開啟（${$('#leaf').value === '1' ? '有葉' : '無葉'}）。` : '植被衰減已關閉。') + (hadHeat ? '熱力圖已清除，請重新計算。' : ''));
+}));
+// map layer: canopy height in greens
+let canEnt = null;
+function drawCanopy() {
+  if (!st.viewer) return;
+  if (!$('#showC').checked || !st.canopy) { if (canEnt) canEnt.show = false; return; }
+  if (!canEnt) {
+    const m = st.canopy.meta, cv = document.createElement('canvas'); cv.width = m.nx; cv.height = m.nz;
+    const cx = cv.getContext('2d'), img = cx.createImageData(m.nx, m.nz), h = st.canopy.h;
+    for (let j = 0; j < m.nz; j++) for (let i = 0; i < m.nx; i++) {
+      const v = h[j * m.nx + i]; if (!v) continue;
+      const o = ((m.nz - 1 - j) * m.nx + i) * 4, t = Math.min(1, v / 20);
+      img.data[o] = 40 + 30 * (1 - t); img.data[o + 1] = 150 + 60 * (1 - t); img.data[o + 2] = 60; img.data[o + 3] = 120 + 100 * t;
+    }
+    cx.putImageData(img, 0, 0);
+    const mLat = 111320, mLon = 111320 * Math.cos(m.ref.lat * Math.PI / 180), s2 = m.step / 2;
+    const rect = Cesium.Rectangle.fromDegrees(m.ref.lon + (m.x0 - s2) / mLon, m.ref.lat + (m.z0 - s2) / mLat, m.ref.lon + (m.x0 + (m.nx - .5) * m.step) / mLon, m.ref.lat + (m.z0 + (m.nz - .5) * m.step) / mLat);
+    canEnt = st.viewer.entities.add({ rectangle: { coordinates: rect, material: new Cesium.ImageMaterialProperty({ image: cv, transparent: true }) } });
+  }
+  canEnt.show = true;
+}
+$('#showC').addEventListener('change', drawCanopy);
+
 /* ===== sites, bands, BS position ===== */
 function syncBand(fromUser) {
   const b = curBand();
@@ -2031,7 +2130,7 @@ async function moveBS(lat, lon) {
     $('#showM').closest('label').hidden = true;
     const zo = $('#zPts').querySelector('option[value="sites"]'); if (zo) zo.textContent = '半徑內的 UE';
   }
-  syncBSFields(); syncBand(false); syncLbNote(); syncExtraNote(); syncSums(); syncCalHint(); syncLidarNote();
+  syncBSFields(); syncBand(false); syncLbNote(); syncExtraNote(); syncSums(); syncCalHint(); syncLidarNote(); syncVeg();
   $('#band').addEventListener('change', () => { $('#fMHz').value = curBand().f; syncBand(true); syncLbNote(); st.cache = {}; refresh(false); });
   ['#bw', '#scs', '#fMHz'].forEach(sel => $(sel).addEventListener('change', () => syncBand(false)));
   $('#bsApply').onclick = () => moveBS(+$('#bsLat').value, +$('#bsLon').value);
@@ -2138,6 +2237,7 @@ $('#go').onclick = async () => {
     const osm = await osmP;
     if (osm) st.osm = osm.parsed || parseOSM(osm);
     await ensureLidar();
+    await ensureCanopy();
     if (!st.osm.length) throw new Error('這個範圍內 OSM 沒有建築資料');
     status('計算射線…');
     await new Promise(r => setTimeout(r, 30));
@@ -2395,7 +2495,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 17:10';
+const APP_VERSION = '2026-11-07 23:10';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -2557,9 +2657,14 @@ Object.assign(EN, {"地形用 AWS Terrain Tiles（約 30 m）：建築、UE 放�
 Object.assign(EN, {"站點覆蓋評估": "Site coverage evaluation"});
 Object.assign(EN, {"終端損耗 (dB)": "Device loss (dB)", "規劃情境": "Planning scenario", "戶外手持（+0 dB）": "Outdoor handheld (+0 dB)", "車內（+8 dB）": "In-car (+8 dB)", "站點校準修正 (dB)": "Site calibration correction (dB)", "清除校準修正": "Clear calibration correction", "還沒用這個站點的路測校準。": "Not calibrated with this site's drive test yet.", "這個站點沒有路測，校準修正為 0；預設值和其他站點相同。": "This site has no drive test, so the correction is 0; defaults are the same as at every other site.", "沒有路測資料，無法校準；校準修正維持 0 dB。": "No drive-test data, so calibration is unavailable; the correction stays at 0 dB.", "校準只調整「站點校準修正」，讓路測點的預測 − 實測平均誤差歸零；終端損耗與規劃情境不變。": "Calibration changes only the site calibration correction so the mean predicted − measured error at drive-test points becomes zero; device loss and planning scenario stay as set.", "戶外手持": "outdoor handheld", "車內": "in-car"});
 Object.assign(EN, {"光達量測（NOAA 2015）": "Lidar measured (NOAA 2015)", "使用光達建築高度": "Use lidar building heights", "載入地圖時一起讀取。": "Read when the map loads.", "光達高度檔讀取失敗，改用 OSM 標籤與預設高度。": "Couldn't read the lidar height file; using OSM tags and default heights.", "已改用光達建築高度。": "Now using lidar building heights. ", "已改回 OSM 標籤與預設高度。": "Back to OSM tags and default heights. ", "高度": "Heights"});
+Object.assign(EN, {"山脊繞射": "Ridge diffraction", "植被衰減（樹冠，試作）": "Vegetation loss (canopy, trial)", "樹葉狀態": "Foliage", "有葉（夏季）": "In leaf (summer)", "無葉（落葉樹，衰減 × 0.5）": "Leaf-off (deciduous, loss × 0.5)", "顯示樹冠（光達）": "Show tree canopy (lidar)", "樹冠高度格網會在載入地圖時讀取（光達）。": "The canopy height grid (lidar) loads with the map.", "植被衰減已關閉。": "Vegetation loss off. ", "＋植被": " + vegetation"});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^樹冠來自 NOAA 2015 光達（2 m 格網）：樹冠覆蓋 (\d+)% 的範圍，樹高中位數 ([\d.]+) m。.*$/, 'Canopy from the NOAA 2015 lidar (2 m grid): trees cover $1% of the area, median tree height $2 m. A path through the crown layer gets Weissberger attenuation by depth (about 7 dB for 10 m, 12 dB for 20 m), and the canopy top competes as a diffraction edge; trees are not treated as reflectors. Checked against the V2 drive test: LOS bias drops only about 1 dB while NLOS becomes 3–4 dB more pessimistic and the spread grows, so it is off by default.'],
+  [/穿過樹冠 (\d+) m（([\d.]+) dB）/, 'through $1 m of canopy ($2 dB)'],
+  [/^植被衰減已開啟（(有葉|無葉)）。/, (m, a) => `Vegetation loss on (${a === '有葉' ? 'in leaf' : 'leaf-off'}). `],
+  [/^樹冠資料讀取失敗（(.+)），不計植被衰減。$/, 'Could not read the canopy data ($1); vegetation is not included.'],
   [/半徑已調整為 (\d+) m（可用範圍 50–1500 m）/g, 'Radius set to $1 m (allowed 50–1500 m)'],
   [/格點間距已調整為 (\d+) m（可用範圍 3–100 m）/g, 'Grid spacing set to $1 m (allowed 3–100 m)'],
   [/格點間距已調整為 (\d+) m：半徑 (\d+) m 時格點上限 (\d+) 個，間距最小 (\d+) m/g, 'Grid spacing set to $1 m: with a $2 m radius the limit of $3 grid points needs at least $4 m spacing'],
