@@ -1,4 +1,6 @@
-# CBRS 站點多徑射線評估工具：開發與設計要點
+# SiteLens（站點覆蓋評估）：開發與設計要點
+
+> 原名「CBRS 站點多徑射線」，2026-11-07 支援多站點、多頻段後改名 SiteLens。
 
 > 專案：Anchorage CBRS 單站評估（https://kckuo-ai.github.io/alaska-rays/）
 > 整理日期：2026-11-07（版本 2026-11-07 09:10）

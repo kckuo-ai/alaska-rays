@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>CBRS 站點多徑射線</title>
+<title>SiteLens</title>
 <script src="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Cesium.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.115.0/Build/Cesium/Widgets/widgets.css">
 <style>
@@ -237,7 +237,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 <div class="app">
   <div id="map"><div id="mstatus" hidden></div>
     <div id="mapbar">
-      <div class="mtitle">CBRS 射線</div>
+      <div class="mtitle">SiteLens</div>
       <div class="seg langm" role="group" aria-label="Language"><button type="button" data-lang="zh" aria-pressed="true">中</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div>
       <button type="button" id="layersBtn" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"></path><path d="M3 13l9 5 9-5"></path></svg><span>圖層與圖例</span></button>
     </div>
@@ -259,9 +259,9 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <aside class="panel" id="panel">
     <div class="handle" id="sheetHandle" role="button" tabindex="0" aria-label="展開或收合面板"><span></span></div>
     <div class="phead">
-      <div class="trow"><h1>CBRS 站點多徑射線</h1>
+      <div class="trow"><h1>SiteLens</h1>
         <div class="seg" role="group" aria-label="Language" style="width:auto;flex:none"><button type="button" data-lang="zh" aria-pressed="true">中文</button><button type="button" data-lang="en" aria-pressed="false">EN</button></div></div>
-      <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br><span class="appver"></span></p>
+      <p class="sub"><b>站點覆蓋評估</b><br>射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br><span class="appver"></span></p>
     </div>
     <nav class="tabs" id="tabs" aria-label="面板分頁">
       <button type="button" data-tab="set" aria-pressed="true"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5s-7-6.1-7-11.5a7 7 0 0 1 14 0c0 5.4-7 11.5-7 11.5z"></path><circle cx="12" cy="10" r="2.6"></circle></svg></i><span>站點</span></button>
@@ -380,6 +380,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <div class="tools" id="calTools" style="margin-top:10px">
         <button type="button" id="calLos">用 LOS 路測點校準額外損耗</button>
         <button type="button" id="calAll">用全部路測點校準</button>
+        <button type="button" id="calReset">還原預設額外損耗</button>
       </div>
       <p class="sub" id="calNote" style="margin-top:6px"></p>
       <details class="mnotes" style="margin-top:8px"><summary>模型假設</summary>
@@ -763,7 +764,7 @@ const RT = (() => {
 const ringUEs = (lat, lon, offs) => offs.map(([e, n]) => ({ lat: +(lat + n / 111320).toFixed(7), lon: +(lon + e / (111320 * Math.cos(lat * Math.PI / 180))).toFixed(7) }));
 const SITES = {
   anchorage: {
-    name: 'Anchorage', title: 'CBRS 站點多徑射線', short: 'CBRS 射線', store: 'alaska', band: 'n48',
+    name: 'Anchorage', store: 'alaska', band: 'n48',
     bs: { lat: 61.1729384, lon: -149.8841974 },
     ues: [
       [61.1735872, -149.8857155], [61.1721515, -149.8827259], [61.1754019, -149.8838769], [61.1746329, -149.8828644],
@@ -773,7 +774,7 @@ const SITES = {
     v2: { tower: [61.1728742, -149.88421488], utc: "2026-11-04", rows: [[38,61.1720903,-149.8844744,-99,-11,17,15,0],[39,61.1709414,-149.8844269,-106,-11,9,15,0],[40,61.1706616,-149.8832569,-112,-11,11,15,0],[41,61.1699155,-149.8830957,-119,-12,2,15,0],[42,61.1691207,-149.8821148,-119,-12,5,15,0],[43,61.1680679,-149.8815798,-126,-14,5,15,0],[44,61.1672085,-149.8811563,-127,-15,0,15,0],[45,61.1667477,-149.8805588,null,null,null,null,0],[46,61.1665482,-149.8806022,null,null,null,null,0],[47,61.1665937,-149.8834488,null,null,null,null,0],[48,61.1674583,-149.886345,null,null,null,null,0],[49,61.1695553,-149.886265,-106,-11,5,15,0],[50,61.1725342,-149.8862741,-104,-17,-3,15,0],[51,61.173332,-149.8863359,-101,-11,14,14,0],[52,61.1736887,-149.888122,-96,-11,21,14,0],[53,61.1736797,-149.8959425,-124,-14,1,14,0],[54,61.1740745,-149.897883,-122,-13,3,14,0],[55,61.1776181,-149.8979025,-128,-15,-4,14,0],[56,61.1793577,-149.8978881,null,null,null,null,0],[57,61.1806851,-149.8954412,null,null,null,null,0],[58,61.1806626,-149.8904118,null,null,null,null,0],[59,61.1798431,-149.8865554,null,null,null,null,0],[60,61.1784078,-149.8865239,-129,-17,-6,14,0],[61,61.1764676,-149.8865006,-129,-18,-7,14,0],[62,61.17485,-149.8864259,-110,-11,12,14,0],[63,61.1739195,-149.8864099,-90,-11,22,14,0],[64,61.1735454,-149.8853869,-98,-11,19,14,2],[65,61.1735464,-149.8827531,-100,-11,23,13,0],[66,61.17355,-149.8800515,-106,-11,14,13,0],[67,61.1735427,-149.8757785,-125,-14,1,13,0],[68,61.1735337,-149.8707143,null,null,null,null,0],[69,61.1694855,-149.8682557,null,null,null,null,0],[70,61.1669182,-149.8682296,null,null,null,null,1],[71,61.1664797,-149.8685392,null,null,null,null,1],[72,61.166531,-149.8770578,null,null,null,null,1],[73,61.166504,-149.8798525,null,null,null,null,0],[74,61.1689889,-149.8819143,-121,-12,4,15,0],[75,61.1722469,-149.883019,-104,-13,2,15,0],[76,61.1730742,-149.8827681,null,null,null,null,0],[77,61.1730725,-149.8825892,-98,-11,20,13,0],[78,61.1730745,-149.8821971,-100,-11,9,13,0],[79,61.1730675,-149.8813284,-105,-11,14,13,0],[80,61.1730692,-149.8802258,-111,-11,10,13,0],[81,61.1730687,-149.8792339,-113,-11,9,13,0],[82,61.1734858,-149.8789338,-107,-11,16,13,0],[83,61.1741597,-149.8789363,-115,-12,5,13,0],[84,61.1753023,-149.878938,-120,-12,4,13,0],[85,61.1765661,-149.8789464,-121,-12,5,13,0],[86,61.1771691,-149.8789436,null,null,null,null,0],[87,61.1772325,-149.8830126,-124,-14,2,13,0],[88,61.1767915,-149.8831544,-123,-13,1,13,0],[89,61.175969,-149.8831334,-120,-13,5,13,0],[90,61.1747627,-149.8831234,-113,-12,4,13,0],[91,61.1739158,-149.8831078,-108,-11,7,13,0],[92,61.1736246,-149.8839572,-99,-11,12,13,0],[93,61.1732053,-149.8843833,-100,-13,4,14,0],[94,61.1728113,-149.8845061,-107,-16,0,14,0]] }
   },
   kaohsiung: {
-    name: '高雄', title: '高雄站點多徑射線（事前評估）', short: '高雄 射線', store: 'khh', band: 'n79', tw: true, approx: true,
+    name: '高雄', store: 'khh', band: 'n79', tw: true, approx: true,
     bs: { lat: 22.7815028, lon: 120.4187782 },
     area: { lat: 22.7815028, lon: 120.4187782, r: 700 },
     ues: ringUEs(22.7815028, 120.4187782, [[100, 0], [0, 100], [-100, 0], [0, -100], [212, 212], [-212, 212], [-212, -212], [212, -212]]),
@@ -789,6 +790,9 @@ const SITE_ID = (() => {
 })();
 try { localStorage.setItem('lastSite', SITE_ID); } catch (e) {}
 const SITE = SITES[SITE_ID];
+const APP_NAME = 'SiteLens';   // 站點覆蓋評估 / site coverage evaluation
+const appTitle = en => `${APP_NAME} · ${en && EN_SITE[SITE.name] ? EN_SITE[SITE.name] : SITE.name}`;
+const EN_SITE = { '高雄': 'Kaohsiung' };
 const SK = k => SITE.store + k;   // per-site storage keys; Anchorage keeps the original alaska* names
 const ORIG_BS = { ...SITE.bs };
 try { const b = JSON.parse(localStorage.getItem(SK('BS')) || 'null'); if (b && Number.isFinite(b.lat) && Number.isFinite(b.lon)) SITE.bs = b; } catch (e) {}
@@ -1064,8 +1068,8 @@ function drawSite() {
       siteDS.entities.add({ position: toWorld(dir(az, L + 8)), label: { text: 'S' + (k + 1) + ' ' + Math.round(sectorAz(a, k)) + '°', font: '600 12px sans-serif', fillColor: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     }
   }
-  siteDS.entities.add({ position: toWorld(tx), billboard: { image: BS_ICON, width: 28, height: 26, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-    label: { text: 'BS', font: '700 13px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -22), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+  siteDS.entities.add({ position: toWorld(tx), billboard: { image: BS_ICON, width: 16, height: 15, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+    label: { text: 'BS', font: '600 11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
   if ($('#showU').checked) SITE.ues.forEach((u, i) => {
     const on = st.sel === i || st.sel === 'all', lk = link(traceUE(i)), lv = lk ? rsrpLv(lk.rsrp) : RSRP_LV[4];
     const plain = curTab === 'cov' && !!st.area;
@@ -1883,7 +1887,7 @@ function syncCalHint() {
   if (HAS_V2) {
     if (st.cal) {
       el.className = 'calhint';
-      el.innerHTML = `已用路測校準：額外損耗 ${fmt(x)} dB（${st.cal.which === 'los' ? 'LOS ' : '全部 '}${st.cal.n} 點，平均誤差歸零）。<div class="tools"><button type="button" data-cal="${st.cal.which === 'los' ? 'all' : 'los'}">改用${st.cal.which === 'los' ? '全部路測點' : ' LOS 點'}校準</button></div>`;
+      el.innerHTML = `已用路測校準：額外損耗 ${fmt(x)} dB（${st.cal.which === 'los' ? 'LOS ' : '全部 '}${st.cal.n} 點，平均誤差歸零）。<div class="tools"><button type="button" data-cal="${st.cal.which === 'los' ? 'all' : 'los'}">改用${st.cal.which === 'los' ? '全部路測點' : ' LOS 點'}校準</button><button type="button" data-cal="reset">還原預設</button></div>`;
     } else {
       el.className = 'calhint warn';
       el.innerHTML = `模型尚未用路測校準（額外損耗 ${fmt(x)} dB），熱力圖會偏樂觀。<div class="tools"><button type="button" data-cal="all">用全部路測點校準</button><button type="button" data-cal="los">只用 LOS 點校準</button></div>`;
@@ -1891,10 +1895,19 @@ function syncCalHint() {
   } else {
     el.className = 'calhint' + (x === 0 ? ' warn' : '');
     el.innerHTML = x === 0 ? '額外損耗為 0 dB，沒有扣除終端與車體損耗，熱力圖會偏樂觀。到「站點 › 模型與校準」設定。' :
-      `額外損耗 ${fmt(x)} dB${SITE.defaults && SITE.defaults.extraL === x ? '，借用 Anchorage 車內實測的校準值' : ''}。沒有路測可以校準；到「站點 › 模型與校準」修改。`;
+      `額外損耗 ${fmt(x)} dB${SITE.defaults && SITE.defaults.extraL === x ? '，借用 Anchorage 車內實測的校準值' : ''}。沒有路測可以校準；到「站點 › 模型與校準」修改。` + (x !== defExtra() ? '<div class="tools"><button type="button" data-cal="reset">還原預設</button></div>' : '');
   }
 }
-$('#calHint').addEventListener('click', e => { const b = e.target.closest('[data-cal]'); if (b) calibrate(b.dataset.cal); });
+const defExtra = () => (SITE.defaults && SITE.defaults.extraL != null ? SITE.defaults.extraL : 0);
+function resetExtra() {
+  const before = +$('#extraL').value || 0, d = defExtra();
+  $('#extraL').value = d; st.cal = null;
+  try { localStorage.removeItem(SK('Extra')); } catch (e) {}
+  syncLbNote(); if (st.osm) refresh(false); syncCalHint(); syncSums();
+  toast(`額外損耗 ${fmt(before)} → ${fmt(d)} dB（預設值）`);
+}
+$('#calReset').onclick = resetExtra;
+$('#calHint').addEventListener('click', e => { const b = e.target.closest('[data-cal]'); if (b) { if (b.dataset.cal === 'reset') resetExtra(); else calibrate(b.dataset.cal); } });
 
 /* ===== sites, bands, BS position ===== */
 function syncBand(fromUser) {
@@ -1950,9 +1963,8 @@ async function moveBS(lat, lon) {
   [...$('#bsrc').options].forEach(o => { if (!SITE.bsrc.includes(o.value)) o.remove(); });
   if (SITE.bsrc.length === 1 && SITE.bsrc[0] === 'osm') $('#bsrc').options[0].textContent = '即時查詢 OpenStreetMap（之後可下載內附）';
   if (!SITE.tw) document.querySelectorAll('#mode option[data-tw]').forEach(o => o.remove());
-  document.querySelectorAll('h1').forEach(h => { if (h.textContent.trim() === 'CBRS 站點多徑射線') h.textContent = SITE.title; });
-  document.querySelectorAll('.mtitle').forEach(h => { h.textContent = SITE.short; });
-  document.title = SITE.title;
+  document.querySelectorAll('h1, .mtitle').forEach(h => { h.textContent = appTitle(false); });
+  document.title = appTitle(false);
   if (!HAS_V2) {
     $('#optUseM').checked = false; $('#optUseM').closest('label').hidden = true;
     $('#showM').closest('label').hidden = true;
@@ -2304,7 +2316,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 15:20';
+const APP_VERSION = '2026-11-07 15:45';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -2461,9 +2473,13 @@ Object.assign(EN, {"站點與基站": "Site and BS", "地圖與建築": "Map and
 Object.assign(EN, {"檢查更新": "Check for updates", "重新載入": "Reload", "無法檢查更新，請確認網路連線。": "Could not check for updates. Check your connection."});
 Object.assign(EN, {"在這個分頁，規劃 UE 顯示為白點（數值看「點位」）；路測點依「疊上路測」的設定顯示。": "On this tab, planned UEs are white dots (see Points for their values); drive-test points follow the Drive-test overlay setting."});
 Object.assign(EN, {"只用 LOS 點校準": "Calibrate with LOS points only", "改用全部路測點校準": "Recalibrate with all drive-test points", "改用 LOS 點校準": "Recalibrate with LOS points", "額外損耗為 0 dB，沒有扣除終端與車體損耗，熱力圖會偏樂觀。到「站點 › 模型與校準」設定。": "Extra loss is 0 dB, so device and vehicle losses aren't deducted and the heatmap will be optimistic. Set it under Site › Model and calibration."});
+Object.assign(EN, {"還原預設額外損耗": "Reset extra loss to default", "還原預設": "Reset to default"});
+Object.assign(EN, {"地形用 AWS Terrain Tiles（約 30 m）：建築、UE 放在地面上，穿過地面的路徑捨棄，山脊和屋頂一起取最強的一處算繞射。關閉地形時地面為水平面。h₀ 是 BS 地面在顯示圖層中的高度；用 Google 寫實 3D 時取 UE 位置模型表面高度（扣掉地形）的中位數，只用來對齊疊加圖層。": "Terrain comes from AWS Terrain Tiles (about 30 m): buildings and UEs sit on the ground, paths through the ground are discarded, and ridges compete with rooftops as the single strongest diffraction edge. With terrain off the ground is flat. h₀ is the height of the BS ground in the display layer; with Google photorealistic 3D it is the median model surface height at the UE positions (terrain removed), used only to align the overlay.", "點的種類": "Point type", "採用": "using"});
+Object.assign(EN, {"站點覆蓋評估": "Site coverage evaluation"});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^額外損耗 ([\d.]+) → ([\d.]+) dB（預設值）$/, 'Extra loss $1 → $2 dB (default)'],
   [/^已用路測校準：額外損耗 ([\d.]+) dB（(LOS |全部 )(\d+) 點，平均誤差歸零）。/, (m, a, w, n) => `Calibrated with drive test: extra loss ${a} dB (${w === 'LOS ' ? 'LOS' : 'all'} ${n} points, mean error zeroed). `],
   [/^模型尚未用路測校準（額外損耗 ([\d.]+) dB），熱力圖會偏樂觀。/, 'Not calibrated with the drive test yet (extra loss $1 dB), so the heatmap is optimistic. '],
   [/^額外損耗 ([\d.]+) dB(，借用 Anchorage 車內實測的校準值)?。沒有路測可以校準；到「站點 › 模型與校準」修改。$/, (m, a, b) => `Extra loss ${a} dB${b ? ', borrowed from the Anchorage in-car calibration' : ''}. No drive test to calibrate with; change it under Site › Model and calibration.`],
@@ -2569,7 +2585,7 @@ function setLang(l, init) {
   LANG = l === 'en' ? 'en' : 'zh';
   try { localStorage.setItem('alaskaLang', LANG); } catch (e) {}
   document.documentElement.lang = LANG === 'en' ? 'en' : 'zh-Hant';
-  document.title = LANG === 'en' ? (EN[SITE.title] || SITE.title) : SITE.title;
+  document.title = appTitle(LANG === 'en');
   document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG));
   if (LANG === 'en') { trNode(document.body); return; }
   if (init) return;
