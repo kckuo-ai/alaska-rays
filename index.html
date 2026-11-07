@@ -78,6 +78,9 @@ html,body{overflow-x:hidden}
 details.mnotes summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:32px;display:flex;align-items:center}
 #ptsSeg,#ovSeg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%}
 #ptsSeg button,#ovSeg button{min-height:44px}
+.calhint{margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;line-height:1.5}
+.calhint.warn{border-color:#ffb347;background:rgba(255,179,71,.08)}
+.calhint .tools{margin-top:8px}
 .ovw{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;font:13px var(--mono)}
 .ovw button{all:unset;cursor:pointer;color:var(--accent)}
 .sumbar{padding:10px 18px 12px;background:#141b22;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;flex:none}
@@ -443,6 +446,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
 
     <section class="block" id="heatBlock" data-tab="cov">
       <h2>覆蓋熱力圖</h2>
+      <div id="calHint" class="calhint"></div>
       <div class="row2">
         <label class="f">顯示指標
           <select id="hMetric"><option value="rsrp">RSRP（最強扇區）</option><option value="sinr">SINR</option><option value="sec">服務扇區</option></select>
@@ -1060,8 +1064,8 @@ function drawSite() {
       siteDS.entities.add({ position: toWorld(dir(az, L + 8)), label: { text: 'S' + (k + 1) + ' ' + Math.round(sectorAz(a, k)) + '°', font: '600 12px sans-serif', fillColor: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
     }
   }
-  siteDS.entities.add({ position: toWorld(tx), point: { pixelSize: 13, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-    label: { text: 'BS', font: '600 13px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -18), fillColor: Cesium.Color.ORANGE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+  siteDS.entities.add({ position: toWorld(tx), billboard: { image: BS_ICON, width: 28, height: 26, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+    label: { text: 'BS', font: '700 13px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -22), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
   if ($('#showU').checked) SITE.ues.forEach((u, i) => {
     const on = st.sel === i || st.sel === 'all', lk = link(traceUE(i)), lv = lk ? rsrpLv(lk.rsrp) : RSRP_LV[4];
     const plain = curTab === 'cov' && !!st.area;
@@ -1611,7 +1615,8 @@ function calibrate(which) {
   if (!x) { status(which === 'los' ? '目前沒有 LOS 的實測點可以校準。' : '沒有可比對的實測點。', true); return; }
   const before = +$('#extraL').value || 0, after = Math.round((before + x.mean) * 10) / 10;
   $('#extraL').value = after; $('#extraL').dataset.last = String(after);
-  syncLbNote(); refresh(false);
+  st.cal = { which, n: x.n }; saveExtra();
+  syncLbNote(); refresh(false); syncCalHint(); syncSums();
   toast(`額外損耗 ${fmt(before)} → <b>${fmt(after)} dB</b>（依 ${x.n} 個${which === 'los' ? ' LOS ' : ''}實測點，平均誤差歸零）`);
 }
 $('#calLos').onclick = () => calibrate('los');
@@ -1639,6 +1644,7 @@ $('#tbl').addEventListener('click', e => {
 });
 ['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
 ['#ruP', '#nPort', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
+$('#extraL').addEventListener('change', () => { st.cal = null; saveExtra(); syncCalHint(); });
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#diffOn').addEventListener('change', () => { st.cache = {}; if (st.osm && st.viewer) refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
@@ -1868,6 +1874,28 @@ $('#pbody').addEventListener('change', () => syncSums());
   if (window.matchMedia('(max-width:699px)').matches) setCollapsed(true);
 })();
 
+/* ===== extra loss / calibration status ===== */
+function saveExtra() { try { localStorage.setItem(SK('Extra'), JSON.stringify({ v: +$('#extraL').value || 0, cal: st.cal || null })); } catch (e) {} }
+(function loadExtra() { try { const j = JSON.parse(localStorage.getItem(SK('Extra')) || 'null'); if (j && Number.isFinite(j.v)) { $('#extraL').value = j.v; st.cal = j.cal || null; } } catch (e) {} })();
+function syncCalHint() {
+  const el = $('#calHint'); if (!el) return;
+  const x = +$('#extraL').value || 0;
+  if (HAS_V2) {
+    if (st.cal) {
+      el.className = 'calhint';
+      el.innerHTML = `已用路測校準：額外損耗 ${fmt(x)} dB（${st.cal.which === 'los' ? 'LOS ' : '全部 '}${st.cal.n} 點，平均誤差歸零）。<div class="tools"><button type="button" data-cal="${st.cal.which === 'los' ? 'all' : 'los'}">改用${st.cal.which === 'los' ? '全部路測點' : ' LOS 點'}校準</button></div>`;
+    } else {
+      el.className = 'calhint warn';
+      el.innerHTML = `模型尚未用路測校準（額外損耗 ${fmt(x)} dB），熱力圖會偏樂觀。<div class="tools"><button type="button" data-cal="all">用全部路測點校準</button><button type="button" data-cal="los">只用 LOS 點校準</button></div>`;
+    }
+  } else {
+    el.className = 'calhint' + (x === 0 ? ' warn' : '');
+    el.innerHTML = x === 0 ? '額外損耗為 0 dB，沒有扣除終端與車體損耗，熱力圖會偏樂觀。到「站點 › 模型與校準」設定。' :
+      `額外損耗 ${fmt(x)} dB${SITE.defaults && SITE.defaults.extraL === x ? '，借用 Anchorage 車內實測的校準值' : ''}。沒有路測可以校準；到「站點 › 模型與校準」修改。`;
+  }
+}
+$('#calHint').addEventListener('click', e => { const b = e.target.closest('[data-cal]'); if (b) calibrate(b.dataset.cal); });
+
 /* ===== sites, bands, BS position ===== */
 function syncBand(fromUser) {
   const b = curBand();
@@ -1916,7 +1944,8 @@ async function moveBS(lat, lon) {
   $('#band').innerHTML = Object.entries(BANDS).map(([id, b]) => `<option value="${id}">${b.lbl}</option>`).join('');
   $('#band').value = SITE.band || 'n48';
   const d = SITE.defaults || {};
-  for (const [k, v] of Object.entries(d)) { const el = document.getElementById(k); if (el) el.value = v; }
+  let savedExtra = false; try { savedExtra = !!localStorage.getItem(SK('Extra')); } catch (e) {}
+  for (const [k, v] of Object.entries(d)) { if (k === 'extraL' && savedExtra) continue; const el = document.getElementById(k); if (el) el.value = v; }
   if (d.antModel) applyAntModel(true);
   [...$('#bsrc').options].forEach(o => { if (!SITE.bsrc.includes(o.value)) o.remove(); });
   if (SITE.bsrc.length === 1 && SITE.bsrc[0] === 'osm') $('#bsrc').options[0].textContent = '即時查詢 OpenStreetMap（之後可下載內附）';
@@ -1929,7 +1958,7 @@ async function moveBS(lat, lon) {
     $('#showM').closest('label').hidden = true;
     const zo = $('#zPts').querySelector('option[value="sites"]'); if (zo) zo.textContent = '半徑內的 UE';
   }
-  syncBSFields(); syncBand(false); syncLbNote(); syncSums();
+  syncBSFields(); syncBand(false); syncLbNote(); syncSums(); syncCalHint();
   $('#band').addEventListener('change', () => { $('#fMHz').value = curBand().f; syncBand(true); syncLbNote(); st.cache = {}; refresh(false); });
   ['#bw', '#scs', '#fMHz'].forEach(sel => $(sel).addEventListener('change', () => syncBand(false)));
   $('#bsApply').onclick = () => moveBS(+$('#bsLat').value, +$('#bsLon').value);
@@ -2055,6 +2084,7 @@ $('#go').onclick = async () => {
 /* ===== coverage heatmap ===== */
 const SINR_LV = [[20, '很好', '#3ddc84'], [13, '好', '#a8e05f'], [0, '普通', '#ffd23f'], [-3, '弱', '#ff9f43'], [-Infinity, '很差', '#ff5e5e']];
 let heatDS = null, heatEnt = null, heatRunTok = 0;
+const BS_ICON = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="44" viewBox="0 0 48 44"><path d="M24 4 L44 40 L4 40 Z" fill="#111" stroke="#fff" stroke-width="4" stroke-linejoin="round"/></svg>');
 const HEAT_MAX = 30000, heatMinStep = R => Math.ceil(R / Math.sqrt(HEAT_MAX / Math.PI));
 st.heat = null;
 function heatSig(order) {
@@ -2274,7 +2304,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 14:50';
+const APP_VERSION = '2026-11-07 15:20';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -2430,9 +2460,13 @@ Object.assign(EN, {"地形高程": "Terrain", "地形關閉：地面視為水平
 Object.assign(EN, {"站點與基站": "Site and BS", "地圖與建築": "Map and buildings", "設備與頻段": "Equipment and band", "模型與校準": "Model and calibration", "站點": "Site", "點位": "Points", "覆蓋": "Coverage", "資料": "Data", "地形": "Terrain", "路測": "Drive test", "檔案": "Files", "模型假設": "Model assumptions", "規劃 UE": "Planned UEs", "路測點": "Drive-test points", "（未匯入）": " (not imported)", "疊上路測": "Drive-test overlay", "不疊": "Off", "實測值": "Measured", "預測−實測": "Predicted − measured", "路測比對": "Drive-test comparison", "誤差最大的點": "Largest errors", "到點位看全部路測點": "See all drive-test points in Points", "用 LOS 路測點校準額外損耗": "Calibrate extra loss with LOS drive-test points", "用全部路測點校準": "Calibrate with all drive-test points", "校準會調整「額外損耗」，讓預測 − 實測的平均誤差歸零。": "Calibration adjusts \"Extra loss\" so the mean predicted − measured error becomes zero.", "沒有路測資料，無法校準。": "No drive-test data, so calibration is unavailable. ", "尚未匯入。事前評估不需要路測；後期優化有路測後，可以用來校準模型、在覆蓋圖上比對。": "Not imported. Pre-deployment evaluation needs no drive test; once one exists for optimization, use it to calibrate the model and compare on the coverage map.", "沒有路測資料。到「站點 › 資料」可以看路測狀態。": "No drive-test data. See its status under Site › Data.", "路測點用和熱力圖相同的 RSRP 分級顏色：點的顏色和底下熱力圖相近，代表預測準。": "Drive-test points use the same RSRP colors as the heatmap: where a point matches the color beneath it, the prediction is accurate.", "路測點顏色為預測 − 實測：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內，灰色＝實測無服務。": "Point color shows predicted − measured: orange = model too high, blue = too low, white = within ±3 dB, gray = no service measured.", "點表格或地圖上的路測點，可以看該點的射線。地圖上的顏色：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內。": "Tap a row or a drive-test point on the map to see its rays. Map colors: orange = model too high, blue = too low, white = within ±3 dB.", "≥ −110 dBm 面積": "≥ −110 dBm area", "覆蓋率": "coverage", "邊緣 RSRP": "Edge RSRP", "最差 10%": "worst 10%", "SINR 中位數": "SINR median", "SNR 中位數": "SNR median", "RSRP 中位數": "RSRP median", "平均誤差": "Mean error", "標準差": "Std dev", "PCI 吻合": "PCI match", "LOS 誤差": "LOS error", "預測−實測 · ": "predicted − measured · ", "地形關閉": "terrain off", "地形載入失敗": "terrain failed to load", "地形：載入後顯示": "terrain: shown after loading", "建築：載入後顯示": "buildings: shown after loading", "路測未匯入": "no drive test", "（借用值）": " (borrowed value)", "反射（含二次）": "reflection (incl. 2nd order)", "＋穿透": " + penetration", "＋繞射": " + diffraction", "＋地形": " + terrain", "樓頂": "roof", "中位數": "median", "邊緣": "edge"});
 Object.assign(EN, {"檢查更新": "Check for updates", "重新載入": "Reload", "無法檢查更新，請確認網路連線。": "Could not check for updates. Check your connection."});
 Object.assign(EN, {"在這個分頁，規劃 UE 顯示為白點（數值看「點位」）；路測點依「疊上路測」的設定顯示。": "On this tab, planned UEs are white dots (see Points for their values); drive-test points follow the Drive-test overlay setting."});
+Object.assign(EN, {"只用 LOS 點校準": "Calibrate with LOS points only", "改用全部路測點校準": "Recalibrate with all drive-test points", "改用 LOS 點校準": "Recalibrate with LOS points", "額外損耗為 0 dB，沒有扣除終端與車體損耗，熱力圖會偏樂觀。到「站點 › 模型與校準」設定。": "Extra loss is 0 dB, so device and vehicle losses aren't deducted and the heatmap will be optimistic. Set it under Site › Model and calibration."});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^已用路測校準：額外損耗 ([\d.]+) dB（(LOS |全部 )(\d+) 點，平均誤差歸零）。/, (m, a, w, n) => `Calibrated with drive test: extra loss ${a} dB (${w === 'LOS ' ? 'LOS' : 'all'} ${n} points, mean error zeroed). `],
+  [/^模型尚未用路測校準（額外損耗 ([\d.]+) dB），熱力圖會偏樂觀。/, 'Not calibrated with the drive test yet (extra loss $1 dB), so the heatmap is optimistic. '],
+  [/^額外損耗 ([\d.]+) dB(，借用 Anchorage 車內實測的校準值)?。沒有路測可以校準；到「站點 › 模型與校準」修改。$/, (m, a, b) => `Extra loss ${a} dB${b ? ', borrowed from the Anchorage in-car calibration' : ''}. No drive test to calibrate with; change it under Site › Model and calibration.`],
   [/^有新版本 (.+)$/, 'New version $1'],
   [/^已是最新版本（(.+)）。$/, 'You have the latest version ($1).'],
   [/建築 (\d+) 棟（(\d+) 棟無高度）/, 'Buildings $1 ($2 without height)'],
