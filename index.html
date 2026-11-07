@@ -58,6 +58,23 @@ html,body{overflow-x:hidden}
 .tabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent);background:transparent;font-weight:700}
 .tabs button:hover{border-color:transparent;color:var(--fg)}
 .tabs button[aria-pressed=true]:hover{border-bottom-color:var(--accent);color:var(--accent)}
+.block.coll h2{margin:0}
+.ctog{all:unset;box-sizing:border-box;display:flex;justify-content:space-between;align-items:center;width:100%;min-height:36px;cursor:pointer;font:inherit;letter-spacing:inherit;color:inherit}
+.ctog:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.ctog i::after{content:"▾";font-style:normal;color:var(--muted);font-size:13px}
+.block.coll.closed .ctog i::after{content:"▸"}
+.block.coll.closed > :not(h2):not(.secsum){display:none!important}
+.block.coll:not(.closed) > .secsum{display:none}
+.secsum{margin:4px 0 0;font:13px/1.5 var(--mono);color:var(--muted)}
+.drow{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.drow:first-of-type{border-top:0}
+.dk{font-size:13px;color:var(--muted);padding-top:2px}
+.dv .sub{margin:4px 0 0}
+details.mnotes summary{cursor:pointer;color:var(--muted);font-size:13px;min-height:32px;display:flex;align-items:center}
+#ptsSeg,#ovSeg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%}
+#ptsSeg button,#ovSeg button{min-height:44px}
+.ovw{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;font:13px var(--mono)}
+.ovw button{all:unset;cursor:pointer;color:var(--accent)}
 .sumbar{padding:10px 18px 12px;background:#141b22;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px;flex:none}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .kpi{min-width:0;display:flex;flex-direction:column}
@@ -238,10 +255,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <p class="sub">射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。<br><span class="appver"></span></p>
     </div>
     <nav class="tabs" id="tabs" aria-label="面板分頁">
-      <button type="button" data-tab="set" aria-pressed="true"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h11M18 6h3M3 12h5M12 12h9M3 18h13M20 18h1"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg></i><span>設定</span></button>
+      <button type="button" data-tab="set" aria-pressed="true"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5s-7-6.1-7-11.5a7 7 0 0 1 14 0c0 5.4-7 11.5-7 11.5z"></path><circle cx="12" cy="10" r="2.6"></circle></svg></i><span>站點</span></button>
       <button type="button" data-tab="ant" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="1.6"></circle><path d="M12 10L8 21M12 10l4 11M9.3 17.2h5.4"></path><path d="M8.6 4.8a4.6 4.6 0 0 0 0 6.4M15.4 4.8a4.6 4.6 0 0 1 0 6.4M5.7 2.6a8.4 8.4 0 0 0 0 10.8M18.3 2.6a8.4 8.4 0 0 1 0 10.8"></path></svg></i><span>天線</span></button>
-      <button type="button" data-tab="res" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-width="3" d="M4.5 20.5v-3.5M9.5 20.5v-7.5M14.5 20.5v-11.5M19.5 20.5v-16"></path></svg></i><span>結果</span></button>
-      <button type="button" data-tab="v2" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.5s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"></path><path d="M9.3 10.4l1.9 1.9 3.6-3.7"></path></svg></i><span>實測</span></button>
+      <button type="button" data-tab="cov" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg></i><span>覆蓋</span></button>
+      <button type="button" data-tab="pts" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="15.5" r="2.4"></circle><circle cx="12" cy="7" r="2.4"></circle><circle cx="18" cy="13.5" r="2.4"></circle><path d="M3 21h18"></path></svg></i><span>點位</span></button>
       <button type="button" data-tab="opt" aria-pressed="false"><i class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5L14 10"></path><path d="M12.6 8.6l2.8 2.8"></path><path d="M18 2.5v5M15.5 5h5M7.5 3v3M6 4.5h3M19.5 13v3M18 14.5h3"></path></svg></i><span>最佳化</span></button>
     </nav>
     <div class="sumbar">
@@ -252,8 +269,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
     </div>
     <div class="pbody" id="pbody">
 
-    <section class="block" data-tab="set">
-      <h2>站點</h2>
+    <section class="block coll" data-tab="set" id="secSite">
+      <h2><button type="button" class="ctog" aria-expanded="true">站點與基站<i aria-hidden="true"></i></button></h2>
+      <p class="secsum" id="secSiteSum"></p>
+
       <label class="f">評估站點<select id="siteSel"></select></label>
       <div class="row2" style="margin-top:8px">
         <label class="f">基站緯度<input type="number" id="bsLat" step="0.000001" inputmode="decimal"></label>
@@ -265,10 +284,14 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <button type="button" id="bsReset">還原</button>
       </div>
       <p class="sub" id="bsNote" style="margin-top:6px"></p>
+      <div class="row2" style="margin-top:8px">
+        <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
+        <label class="f">BS 所在建築高度 (m)<input type="number" id="bsH" step="0.5"></label>
+      </div>
     </section>
 
     <section class="block" data-tab="set">
-      <h2>啟動</h2>
+      <h2>地圖與建築</h2>
       <label class="f">背景
         <select id="mode">
           <option value="sat">衛星影像＋OSM 建築體（免金鑰）</option>
@@ -296,38 +319,68 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <p id="status" style="margin:8px 0 0">選好背景後按「載入地圖並計算」。</p>
     </section>
 
-    <section class="block" data-tab="set">
-      <h2>參數</h2>
+    <section class="block coll" data-tab="set" id="secData">
+      <h2><button type="button" class="ctog" aria-expanded="true">資料<i aria-hidden="true"></i></button></h2>
+      <p class="secsum" id="secDataSum"></p>
+      <div class="drow"><span class="dk">地形</span><div class="dv"><label class="chk"><input type="checkbox" id="terrOn" checked>地形高程</label><p class="sub" id="terrNote"></p></div></div>
+      <div class="drow"><span class="dk">路測</span><div class="dv"><p class="sub" id="dtNote" style="margin:0"></p><div class="tools" id="dtTools" style="margin-top:6px"><button type="button" id="v2Preset">套用 V2 現場設定</button></div></div></div>
+      <div class="drow"><span class="dk">檔案</span><div class="dv"><div class="tools">
+        <button id="dlB">下載建築 JSON</button>
+        <button id="dlR">下載射線 JSON</button>
+        <label class="chk"><input type="file" id="upB" accept=".json" hidden><button type="button" id="upBtn">改用本機建築 JSON</button></label>
+      </div>
+      <p class="sub" style="margin-top:6px">射線 JSON 含每條路徑的經緯度、橢球高與損耗，之後可以換成 Sionna RT 的結果。</p></div></div>
+    </section>
+
+    <section class="block coll" data-tab="set" id="secDev">
+      <h2><button type="button" class="ctog" aria-expanded="true">設備與頻段<i aria-hidden="true"></i></button></h2>
+      <p class="secsum" id="secDevSum"></p>
       <div class="row2">
         <label class="f">頻段（TDD）<select id="band"></select></label>
         <label class="f">中心頻率 (MHz)<input type="number" id="fMHz" value="3625" step="5"></label>
-        <label class="f">RU 每埠輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
-        <label class="f">發射埠數（共用 SAS 上限）<input type="number" id="nPort" value="4" min="1" step="1"></label>
-        <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17.7" step="0.1"></label>
-        <label class="f">饋線與接頭損耗 (dB)<input type="number" id="cableL" value="1" step="0.5"></label>
-        <label class="f" id="sasWrap">SAS 授權 maxEirp (dBm/MHz)<input type="number" id="sasE" value="37" step="1"></label>
-        <label class="f">天線高於樓頂 (m)<input type="number" id="mast" value="3" step="0.5"></label>
-        <label class="f">BS 所在建築高度 (m)<input type="number" id="bsH" step="0.5"></label>
-        <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
-        <label class="f">地面橢球高 h₀ (m)<input type="number" id="h0" step="0.5"></label>
         <label class="f">通道頻寬
           <select id="bw"><option value="10">10 MHz</option><option value="20">20 MHz</option><option value="40" selected>40 MHz</option><option value="50">50 MHz</option><option value="80">80 MHz</option><option value="90">90 MHz</option><option value="100">100 MHz</option></select>
         </label>
         <label class="f">子載波間距 (SCS)
           <select id="scs"><option value="30" selected>30 kHz</option><option value="15">15 kHz</option><option value="60">60 kHz</option></select>
         </label>
+        <label class="f">RU 每埠輸出功率，整個頻寬 (dBm)<input type="number" id="ruP" value="46" step="1"></label>
+        <label class="f">發射埠數（共用 SAS 上限）<input type="number" id="nPort" value="4" min="1" step="1"></label>
+        <label class="f">天線增益 (dBi)<input type="number" id="antG" value="17.7" step="0.1"></label>
+        <label class="f">饋線與接頭損耗 (dB)<input type="number" id="cableL" value="1" step="0.5"></label>
+        <label class="f" id="sasWrap">SAS 授權 maxEirp (dBm/MHz)<input type="number" id="sasE" value="37" step="1"></label>
         <label class="f">UE 雜訊指數 NF (dB)<input type="number" id="nf" value="7" step="0.5"></label>
-        <label class="f">額外損耗：車內、校準 (dB)<input type="number" id="extraL" value="0" step="1"></label>
         <label class="f">SIB1 ss-PBCH-BlockPower (dBm，可留空)<input type="number" id="ssPwr" step="1" placeholder="例如 −5"></label>
       </div>
       <p class="sub" id="bandNote" style="margin-top:8px"></p>
       <p class="sub" id="lbNote" style="margin-top:4px"></p>
+    </section>
+
+    <section class="block coll" data-tab="set" id="secModel">
+      <h2><button type="button" class="ctog" aria-expanded="true">模型與校準<i aria-hidden="true"></i></button></h2>
+      <p class="secsum" id="secModelSum"></p>
+      <div class="row2">
+        <label class="f">額外損耗：車內、校準 (dB)<input type="number" id="extraL" value="0" step="1"></label>
+        <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
+        <label class="f">地面橢球高 h₀ (m)<input type="number" id="h0" step="0.5"></label>
+      </div>
       <div class="tools" style="margin-top:10px">
         <label class="chk"><input type="checkbox" id="order2" checked>計算二次反射</label>
         <label class="chk"><input type="checkbox" id="diffOn" checked>屋頂繞射</label>
-        <label class="chk"><input type="checkbox" id="terrOn" checked>地形高程</label>
       </div>
-      <p class="sub" id="terrNote" style="margin-top:6px"></p>
+      <div class="tools" id="calTools" style="margin-top:10px">
+        <button type="button" id="calLos">用 LOS 路測點校準額外損耗</button>
+        <button type="button" id="calAll">用全部路測點校準</button>
+      </div>
+      <p class="sub" id="calNote" style="margin-top:6px"></p>
+      <details class="mnotes" style="margin-top:8px"><summary>模型假設</summary>
+      <ul class="notes">
+        <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
+        <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
+        <li>下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m。直射被建築擋住時，加上一條越過主要遮蔽屋頂邊緣的刀鋒繞射路徑（ITU-R P.526 近似）；未計牆角繞射與散射。只列比最強路徑弱 40 dB 以內者。</li>
+        <li>地形用 AWS Terrain Tiles（約 30 m）：建築、UE 放在地面上，穿過地面的路徑捨棄，山脊和屋頂一起取最強的一處算繞射。關閉地形時地面為水平面。h₀ 是 BS 地面在顯示圖層中的高度；用 Google 寫實 3D 時取 UE 位置模型表面高度（扣掉地形）的中位數，只用來對齊疊加圖層。</li>
+      </ul>
+      <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p></details>
     </section>
 
     <section class="block" data-tab="ant">
@@ -382,7 +435,42 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </div>
     </section>
 
-    <section class="block" data-tab="ant">
+    <section class="block" id="heatBlock" data-tab="cov">
+      <h2>覆蓋熱力圖</h2>
+      <div class="row2">
+        <label class="f">顯示指標
+          <select id="hMetric"><option value="rsrp">RSRP（最強扇區）</option><option value="sinr">SINR</option><option value="sec">服務扇區</option></select>
+        </label>
+        <label class="f">色階
+          <select id="hStyle"><option value="smooth" selected>平滑漸層</option><option value="grid">分級格點</option></select>
+        </label>
+        <label class="f" style="grid-column:1/-1">不透明度 <output id="hOpOut"></output><input type="range" id="hOp" min="20" max="100" step="5" value="70"></label>
+        <label class="f">範圍半徑 (m)<input type="number" id="hR" value="300" min="50" max="1500" step="50"></label>
+        <label class="f">格點間距 (m)<input type="number" id="hStep" value="10" min="3" max="100" step="1"></label>
+        <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="hOrder2">含二次反射（較準，但慢約 10 倍）</label>
+      </div>
+      <p class="sub" id="hEst" style="margin-top:6px"></p>
+      <div class="tools" style="margin-top:8px">
+        <button type="button" class="primary" id="hRun">計算熱力圖</button>
+        <button type="button" id="hClear" hidden>清除熱力圖</button>
+      </div>
+      <p class="sub" id="hNote" style="margin-top:6px">只計算室外格點。算完後轉動天線方位角或下傾角、改功率，熱力圖會即時更新。點地圖上的熱力圖可以看該點的數值。</p>
+      <div id="hStats" style="margin-top:8px"></div>
+    </section>
+
+    <section class="block" id="ovBlock" data-tab="cov">
+      <h2>疊上路測</h2>
+      <div class="seg" role="group" aria-label="疊上路測" id="ovSeg"><button type="button" data-ov="none" aria-pressed="true">不疊</button><button type="button" data-ov="meas" aria-pressed="false">實測值</button><button type="button" data-ov="diff" aria-pressed="false">預測−實測</button></div>
+      <p class="sub" id="ovNote" style="margin-top:6px"></p>
+      <div id="ovWorst" style="margin-top:8px"></div>
+    </section>
+
+    <section class="block" id="ptsBlock" data-tab="pts">
+      <div class="seg" role="group" aria-label="點的種類" id="ptsSeg"><button type="button" data-pm="ue" aria-pressed="true">規劃 UE</button><button type="button" data-pm="meas" aria-pressed="false">路測點</button></div>
+      <p class="sub" id="ptsNote" style="margin-top:6px" hidden></p>
+    </section>
+
+    <section class="block" data-tab="pts" data-pm="ue">
       <h2>UE 位置</h2>
       <p class="sub" id="ueEditHint">在上方選一個 UE（點地圖上的 UE 也可以），就能修改它的位置。</p>
       <div id="ueEdit" hidden style="margin-top:10px">
@@ -398,16 +486,24 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </div>
     </section>
 
-    <section class="block" id="v2Block" data-tab="v2">
-      <h2>V2 實測對照（2026-11-04 路測，57 點）</h2>
-      <div class="tools">
-        <button type="button" id="v2Preset">套用 V2 現場設定</button>
-      </div>
-      <p class="sub" style="margin-top:6px">現場設定：天線離地 13 m、三扇區方位 30° / 150° / 270°（PCI 13 / 15 / 14）。點地圖上的實測點可以看該點的射線和比對結果。</p>
-      <div class="tools" style="margin-top:8px">
-        <button type="button" id="calLos">用 LOS 點校準額外損耗</button>
-        <button type="button" id="calAll">用全部點校準</button>
-      </div>
+    <section class="block" id="sumBlock" data-tab="pts" data-pm="ue">
+      <h2 id="sumTitle">通道摘要</h2>
+      <dl class="stats" id="stats"><div><dt>尚未計算</dt><dd>—</dd></div></dl>
+    </section>
+
+    <section class="block" id="pdpBlock" data-tab="pts" data-pm="ue">
+      <h2>功率時延剖面</h2>
+      <svg id="pdp" viewBox="0 0 360 150"></svg>
+    </section>
+
+    <section class="block" data-tab="pts" data-pm="ue">
+      <h2 id="tblTitle">路徑</h2>
+      <div style="overflow-x:auto"><table id="tbl"></table></div>
+    </section>
+
+    <section class="block" id="v2Block" data-tab="pts" data-pm="meas">
+      <h2><span id="v2Title">路測比對</span></h2>
+      <p class="sub">點表格或地圖上的路測點，可以看該點的射線。地圖上的顏色：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內。</p>
       <div id="v2Out" style="margin-top:10px"><p class="sub">載入地圖並計算後顯示比對結果。</p></div>
     </section>
 
@@ -445,65 +541,6 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <button type="button" id="optApply" hidden>套用最佳設定</button>
       </div>
       <div id="optOut" style="margin-top:10px"></div>
-    </section>
-
-    <section class="block" id="heatBlock" data-tab="res">
-      <h2>覆蓋熱力圖</h2>
-      <div class="row2">
-        <label class="f">顯示指標
-          <select id="hMetric"><option value="rsrp">RSRP（最強扇區）</option><option value="sinr">SINR</option><option value="sec">服務扇區</option></select>
-        </label>
-        <label class="f">色階
-          <select id="hStyle"><option value="smooth" selected>平滑漸層</option><option value="grid">分級格點</option></select>
-        </label>
-        <label class="f" style="grid-column:1/-1">不透明度 <output id="hOpOut"></output><input type="range" id="hOp" min="20" max="100" step="5" value="70"></label>
-        <label class="f">範圍半徑 (m)<input type="number" id="hR" value="300" min="50" max="1500" step="50"></label>
-        <label class="f">格點間距 (m)<input type="number" id="hStep" value="10" min="3" max="100" step="1"></label>
-        <label class="chk" style="grid-column:1/-1"><input type="checkbox" id="hOrder2">含二次反射（較準，但慢約 10 倍）</label>
-      </div>
-      <p class="sub" id="hEst" style="margin-top:6px"></p>
-      <div class="tools" style="margin-top:8px">
-        <button type="button" class="primary" id="hRun">計算熱力圖</button>
-        <button type="button" id="hClear" hidden>清除熱力圖</button>
-      </div>
-      <p class="sub" id="hNote" style="margin-top:6px">只計算室外格點。算完後轉動天線方位角或下傾角、改功率，熱力圖會即時更新。點地圖上的熱力圖可以看該點的數值。</p>
-      <div id="hStats" style="margin-top:8px"></div>
-    </section>
-
-    <section class="block" id="sumBlock" data-tab="res">
-      <h2 id="sumTitle">通道摘要</h2>
-      <dl class="stats" id="stats"><div><dt>尚未計算</dt><dd>—</dd></div></dl>
-    </section>
-
-    <section class="block" id="pdpBlock" data-tab="res">
-      <h2>功率時延剖面</h2>
-      <svg id="pdp" viewBox="0 0 360 150"></svg>
-    </section>
-
-    <section class="block" data-tab="res">
-      <h2 id="tblTitle">路徑</h2>
-      <div style="overflow-x:auto"><table id="tbl"></table></div>
-    </section>
-
-    <section class="block" data-tab="set">
-      <h2>資料</h2>
-      <div class="tools">
-        <button id="dlB">下載建築 JSON</button>
-        <button id="dlR">下載射線 JSON</button>
-        <label class="chk"><input type="file" id="upB" accept=".json" hidden><button type="button" id="upBtn">改用本機建築 JSON</button></label>
-      </div>
-      <p class="sub" style="margin-top:8px">射線 JSON 含每條路徑的經緯度、橢球高與損耗，之後可以換成 Sionna RT 的結果。</p>
-    </section>
-
-    <section class="block" data-tab="set">
-      <h2>模型假設</h2>
-      <ul class="notes">
-        <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
-        <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
-        <li>下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m。直射被建築擋住時，加上一條越過主要遮蔽屋頂邊緣的刀鋒繞射路徑（ITU-R P.526 近似）；未計牆角繞射與散射。只列比最強路徑弱 40 dB 以內者。</li>
-        <li>地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。</li>
-      </ul>
-      <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p>
     </section>
 
     <p class="sub appverline" data-tab="set"><span class="appver"></span> · <a href="https://github.com/kckuo-ai/alaska-rays" target="_blank" rel="noopener">GitHub</a></p>
@@ -1040,10 +1077,11 @@ function drawSite() {
     });
   }
   if ($('#showM').checked) V2.rows.forEach((m, j) => {
-    const on = st.sel === 'm' + j, col = m[3] == null ? '#6b7480' : rsrpLv(m[3])[2];
+    const on = st.sel === 'm' + j, err = st.mColor === 'diff' && st.v2err ? st.v2err[j] : undefined;
+    const col = m[3] == null ? '#6b7480' : st.mColor === 'diff' ? (err == null ? '#9aa5b1' : diffColor(err)) : rsrpLv(m[3])[2];
     const e = siteDS.entities.add({ position: toWorld(uePos('m' + j)),
       point: { pixelSize: on ? 13 : 8, color: Cesium.Color.fromCssColorString(col), outlineColor: on ? Cesium.Color.WHITE : Cesium.Color.fromCssColorString('#10151b'), outlineWidth: on ? 3 : 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-      label: { text: 'S' + m[0] + (m[3] == null ? ' ✕' : ' ' + m[3]), font: '11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, 12), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      label: { text: 'S' + m[0] + (m[3] == null ? ' ✕' : st.mColor === 'diff' && err != null ? ' ' + (err >= 0 ? '+' : '−') + fmt(Math.abs(err), 0) : ' ' + m[3]), font: '11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, 12), fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: on ? undefined : new Cesium.DistanceDisplayCondition(0, 600) } });
     e.mIndex = j;
   });
@@ -1213,6 +1251,7 @@ function refresh(rebuild) {
   reportDelta();
   renderKpis();
   renderV2();
+  syncSums();
   if (typeof heatRender === 'function') heatRender();
 }
 let toastT;
@@ -1553,7 +1592,10 @@ function renderV2() {
     return `<tr class="p" data-m="${r.j}"><td>S${r.id}<small>${r.los ? 'LOS' : 'NLOS'}${r.pci != null ? ' · PCI ' + r.pci : ''}${!r.omni && r.meas != null && r.serveK !== r.k ? ' · <span class="flag">扇區不符</span>' : ''}</small></td><td>${fmt(r.d, 0)} m</td><td>${meas}</td><td>${pred}</td><td>${e == null ? '—' : (e > 0 ? '+' : '') + fmt(e)}</td></tr>`;
   }).join('') + '</table></div>';
   $('#v2Out').innerHTML = h;
-  st.v2 = { all, los };
+  st.v2 = { all, los, mrate, n: ok.length };
+  st.v2err = {}; ok.forEach(r => { st.v2err[r.j] = r.pred - r.meas; });
+  st.v2rows = rows;
+  renderOvWorst();
 }
 $('#v2Out').addEventListener('click', e => { const tr = e.target.closest('tr[data-m]'); if (!tr || !st.osm) return; st.sel = 'm' + tr.dataset.m; st.picking = null; refresh(false); });
 function calibrate(which) {
@@ -1735,6 +1777,89 @@ $('#terrOn').addEventListener('change', async () => {
 });
 syncTerrNote();
 
+/* ===== coverage overlay, points mode, collapsible setup groups ===== */
+st.mColor = 'level';
+function diffColor(e) {
+  const t = Math.max(-1, Math.min(1, e / 15)), a = Math.abs(t) < 0.2 ? 0 : Math.abs(t);
+  const c = t >= 0 ? [245, 158, 11] : [59, 130, 246], w = [228, 233, 238];
+  return '#' + w.map((x, k) => Math.round(x + (c[k] - x) * a).toString(16).padStart(2, '0')).join('');
+}
+function syncMeasColors() {
+  if (!HAS_V2) return;
+  const want = curTab === 'pts' && ptsMode === 'meas' ? 'diff' : st.ov === 'diff' ? 'diff' : 'level';
+  const show = (curTab === 'pts' && ptsMode === 'meas') || st.ov !== 'none' ? true : $('#showM').checked;
+  if (want !== st.mColor || show !== $('#showM').checked) { st.mColor = want; $('#showM').checked = show; if (st.osm && st.viewer) drawSite(); }
+}
+function setOv(v) {
+  if (!HAS_V2) return;
+  st.ov = v;
+  document.querySelectorAll('#ovSeg [data-ov]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ov === v));
+  if (v === 'none') $('#showM').checked = false;
+  syncMeasColors(); if (st.osm && st.viewer) drawSite();
+  $('#ovNote').textContent = v === 'meas' ? '路測點用和熱力圖相同的 RSRP 分級顏色：點的顏色和底下熱力圖相近，代表預測準。' :
+    v === 'diff' ? '路測點顏色為預測 − 實測：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內，灰色＝實測無服務。' : '';
+  renderOvWorst();
+}
+function renderOvWorst() {
+  const el = $('#ovWorst'); if (!el) return;
+  if (!HAS_V2 || st.ov !== 'diff' || !st.v2rows) { el.innerHTML = ''; return; }
+  const w = st.v2rows.filter(r => r.meas != null && r.pred != null).map(r => ({ r, e: r.pred - r.meas })).sort((a, b) => Math.abs(b.e) - Math.abs(a.e)).slice(0, 5);
+  el.innerHTML = `<p class="sub" style="margin:0 0 6px">誤差最大的點</p><div class="ovw">` + w.map(({ r, e }) =>
+    `<button type="button" data-m="${r.j}">S${r.id}</button><span style="color:var(--muted);font-family:inherit">${r.los ? 'LOS' : 'NLOS'} · ${fmt(r.d, 0)} m</span><span style="color:${diffColor(e)}">${e >= 0 ? '+' : '−'}${fmt(Math.abs(e), 0)}</span>`).join('') +
+    `</div><div class="tools" style="margin-top:8px"><button type="button" id="ovAll">到點位看全部路測點</button></div>`;
+}
+$('#ovSeg').addEventListener('click', e => { const b = e.target.closest('[data-ov]'); if (b && !b.disabled) setOv(b.dataset.ov); });
+$('#ovWorst').addEventListener('click', e => {
+  const b = e.target.closest('[data-m]');
+  if (b) { st.sel = 'm' + b.dataset.m; st.picking = null; refresh(false); return; }
+  if (e.target.id === 'ovAll') { ptsMode = 'meas'; setTab('pts'); }
+});
+$('#ptsSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-pm]'); if (!b || b.disabled) return;
+  ptsMode = b.dataset.pm;
+  if (ptsMode === 'ue' && typeof st.sel === 'string' && st.sel[0] === 'm') st.sel = 0;
+  setTab('pts', true); if (st.osm && st.viewer) refresh(false);
+});
+// setup groups: one-line summaries, collapsed by default on phones
+function syncSums() {
+  const T = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  const L = st.list && bsBuilding >= 0 ? st.list[bsBuilding] : null, roof = L ? L.h : (+$('#bsH').value || 0);
+  T('secSiteSum', `${SITE.name}${SITE.approx ? '（事前評估）' : ''} · ${SITE.bs.lat.toFixed(5)}, ${SITE.bs.lon.toFixed(5)} · 樓頂 ${fmt(roof)} m＋${fmt(+$('#mast').value || 0)} m`);
+  const noH = st.list ? st.list.filter(b => b.src === 'default').length : 0;
+  T('secDataSum', (st.list ? `建築 ${st.list.length} 棟（${noH} 棟無高度）` : '建築：載入後顯示') + ' · ' +
+    (!terrOn() ? '地形關閉' : demFresh() ? `地形高差 ${fmt(st.dem.relief, 0)} m` : st.demErr ? '地形載入失敗' : '地形：載入後顯示') + ' · ' +
+    (HAS_V2 ? `路測 ${V2.rows.length} 點` : '路測未匯入'));
+  const lc = lbCfg();
+  T('secDevSum', `${$('#band').value} · ${$('#fMHz').value} MHz · ${lc.bw} MHz／${lc.scs} kHz · ${lc.nrb} RB · RU ${$('#ruP').value} dBm × ${$('#nPort').value} · 天線 ${$('#antG').value} dBi`);
+  T('secModelSum', `反射${$('#order2').checked ? '（含二次）' : ''}＋穿透${$('#diffOn').checked ? '＋繞射' : ''}${terrOn() ? '＋地形' : ''} · 額外損耗 ${fmt(+$('#extraL').value || 0)} dB${!HAS_V2 && SITE.defaults && SITE.defaults.extraL != null && +$('#extraL').value === SITE.defaults.extraL ? '（借用值）' : ''}`);
+}
+document.querySelectorAll('.block.coll .ctog').forEach(b => b.addEventListener('click', () => {
+  const sec = b.closest('.block'), closed = !sec.classList.contains('closed');
+  sec.classList.toggle('closed', closed); b.setAttribute('aria-expanded', String(!closed)); syncSums();
+}));
+function setCollapsed(closed) { document.querySelectorAll('.block.coll').forEach(sec => { sec.classList.toggle('closed', closed); sec.querySelector('.ctog').setAttribute('aria-expanded', String(!closed)); }); }
+$('#pbody').addEventListener('change', () => syncSums());
+(function initDataRows() {
+  if (HAS_V2) {
+    $('#dtNote').textContent = `V2 路測 ${V2.utc} · ${V2.rows.length} 點（${V2.rows.filter(r => r[3] != null).length} 點有 RSRP）。現場設定：天線離地 13 m、方位 30° / 150° / 270°（PCI 13 / 15 / 14）。`;
+    $('#v2Title').textContent = `路測比對（${V2.utc}，${V2.rows.length} 點）`;
+    $('#calNote').textContent = '校準會調整「額外損耗」，讓預測 − 實測的平均誤差歸零。';
+    st.ov = 'none';
+  } else {
+    $('#dtNote').textContent = '尚未匯入。事前評估不需要路測；後期優化有路測後，可以用來校準模型、在覆蓋圖上比對。';
+    $('#dtTools').hidden = true;
+    $('#calLos').disabled = true; $('#calAll').disabled = true;
+    $('#calNote').textContent = '沒有路測資料，無法校準。' + (SITE.defaults && SITE.defaults.extraL != null ? `額外損耗目前 ${SITE.defaults.extraL} dB 是借用 Anchorage 車內實測的校準值。` : '');
+    document.querySelectorAll('#ovSeg button').forEach(b => { b.disabled = true; });
+    $('#ovNote').textContent = '沒有路測資料。到「站點 › 資料」可以看路測狀態。';
+    const mb = $('#ptsSeg [data-pm="meas"]'); mb.disabled = true; mb.textContent = '路測點（未匯入）';
+    st.ov = 'none';
+  }
+  $('#ptsSeg [data-pm="ue"]').textContent = `規劃 UE · ${SITE.ues.length}`;
+  if (HAS_V2) $('#ptsSeg [data-pm="meas"]').textContent = `路測點 · ${V2.rows.length}`;
+  if (window.matchMedia('(max-width:699px)').matches) setCollapsed(true);
+})();
+
 /* ===== sites, bands, BS position ===== */
 function syncBand(fromUser) {
   const b = curBand();
@@ -1792,12 +1917,11 @@ async function moveBS(lat, lon) {
   document.querySelectorAll('.mtitle').forEach(h => { h.textContent = SITE.short; });
   document.title = SITE.title;
   if (!HAS_V2) {
-    document.querySelectorAll('#tabs [data-tab="v2"], #v2Block').forEach(el => { el.hidden = true; });
     $('#optUseM').checked = false; $('#optUseM').closest('label').hidden = true;
     $('#showM').closest('label').hidden = true;
     const zo = $('#zPts').querySelector('option[value="sites"]'); if (zo) zo.textContent = '半徑內的 UE';
   }
-  syncBSFields(); syncBand(false); syncLbNote();
+  syncBSFields(); syncBand(false); syncLbNote(); syncSums();
   $('#band').addEventListener('change', () => { $('#fMHz').value = curBand().f; syncBand(true); syncLbNote(); st.cache = {}; refresh(false); });
   ['#bw', '#scs', '#fMHz'].forEach(sel => $(sel).addEventListener('change', () => syncBand(false)));
   $('#bsApply').onclick = () => moveBS(+$('#bsLat').value, +$('#bsLon').value);
@@ -1909,7 +2033,7 @@ $('#go').onclick = async () => {
     const t0 = performance.now();
     refresh(true);
     const noH = st.list.filter(b => b.src === 'default').length;
-    if (!st.loadedOnce) { st.loadedOnce = true; setTab('res', true); }
+    if (!st.loadedOnce) { st.loadedOnce = true; setTab('cov', true); }
     status((st.osmNote ? st.osmNote + '\n' : '') + `完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
       (bsBuilding < 0 ? '\n注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。' : '') + (terrOn() ? '\n' + $('#terrNote').textContent : ''));
   } catch (e) {
@@ -2052,10 +2176,10 @@ const pctl = (arr, p) => { if (!arr.length) return NaN; const a = arr.slice().so
 function heatRender() {
   const H = st.heat, metric = $('#hMetric').value;
   $('#hClear').hidden = !H;
-  if (!H || !heatDS || !st.osm) { if (heatDS) heatDS.entities.removeAll(); heatEnt = null; $('#hLegend').innerHTML = ''; $('#hStats').innerHTML = ''; return; }
+  if (!H || !heatDS || !st.osm) { if (heatDS) heatDS.entities.removeAll(); heatEnt = null; $('#hLegend').innerHTML = ''; $('#hStats').innerHTML = ''; if (st.area) { st.area = null; st.areaBase = null; renderKpis(); } return; }
   if (H.sig !== heatSig(H.order)) {
     heatDS.entities.removeAll(); heatEnt = null; $('#hLegend').innerHTML = '';
-    $('#hStats').innerHTML = '<p class="sub flag">建築、天線高度或頻率已變更，請重新計算熱力圖。</p>';
+    $('#hStats').innerHTML = '<p class="sub flag">建築、天線高度或頻率已變更，請重新計算熱力圖。</p>'; st.area = null; st.areaBase = null;
     return;
   }
   const vals = heatEval(); st.heatVals = vals;
@@ -2087,12 +2211,11 @@ function heatRender() {
     rows = L.map((x, k) => [x[1] + ' ' + (k === L.length - 1 ? (metric === 'sinr' ? '< −3' : '< −110') : '≥ ' + fmt(x[0], 0)) + u, x[2], ok.filter(v => (k === 0 || v[key] < L[k - 1][0]) && v[key] >= x[0]).length]); }
   if (tot > ok.length) rows.push(['無路徑', '#5a6470', tot - ok.length]);
   const R = ok.map(v => v.rsrp), Q = ok.map(v => v.sinr), cov = ok.filter(v => v.rsrp >= -110).length;
+  st.area = { cov: tot ? cov / tot * 100 : 0, med: pctl(R, .5), edge: pctl(R, .1), sinr: pctl(Q, .5), omni: !!(ok.length && ok[0].omni) };
+  if (!st.areaBase) st.areaBase = { ...st.area };
+  if (curTab === 'ant' || curTab === 'cov') renderKpis();
   $('#hStats').innerHTML =
-    `<dl class="v2sum"><div><dt>RSRP ≥ −110 dBm 的面積</dt><dd>${tot ? Math.round(cov / tot * 100) : 0}<small>%</small></dd></div>` +
-    `<div><dt>RSRP 中位數</dt><dd>${fv(pctl(R, .5))}<small>dBm</small></dd></div>` +
-    `<div><dt>邊緣 RSRP（最差 10%）</dt><dd>${fv(pctl(R, .1))}<small>dBm</small></dd></div>` +
-    `<div><dt>${ok.length && ok[0].omni ? 'SNR' : 'SINR'} 中位數</dt><dd>${fv(pctl(Q, .5))}<small>dB</small></dd></div>` +
-    `<div><dt>格點</dt><dd>${tot}<small>個 · 間距 ${H.step} m</small></dd></div>` +
+    `<dl class="v2sum"><div><dt>格點</dt><dd>${tot}<small>個 · 間距 ${H.step} m</small></dd></div>` +
     `<div><dt>範圍半徑</dt><dd>${H.R}<small>m</small></dd></div></dl>` +
     `<div class="hbar">${rows.map(r => `<i style="width:${tot ? r[2] / tot * 100 : 0}%;background:${r[1]}"></i>`).join('')}</div>` +
     `<div class="hlv">${rows.map(r => `<i style="background:${r[1]}"></i><span>${r[0]}</span><span>${tot ? Math.round(r[2] / tot * 100) : 0}%</span>`).join('')}</div>` +
@@ -2142,13 +2265,19 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 12:10';
+const APP_VERSION = '2026-11-07 13:40';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 const isPhone = () => window.matchMedia('(max-width:699px)').matches;
 let curTab = 'set';
+let ptsMode = 'ue';
 function setTab(t, noExpand) {
+  if (t === 'res') t = 'cov';
+  if (t === 'v2') { t = 'pts'; ptsMode = HAS_V2 ? 'meas' : 'ue'; }
   curTab = t;
-  document.querySelectorAll('#pbody > [data-tab]').forEach(el => el.classList.toggle('on', el.dataset.tab === t));
+  document.querySelectorAll('#pbody > [data-tab]').forEach(el => el.classList.toggle('on', el.dataset.tab === t && (!el.dataset.pm || el.dataset.pm === ptsMode)));
+  document.querySelectorAll('#ptsSeg [data-pm]').forEach(b => b.setAttribute('aria-pressed', b.dataset.pm === ptsMode));
+  syncMeasColors();
+  renderKpis();
   document.querySelectorAll('#tabs [data-tab]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t));
   try { localStorage.setItem('alaskaTab', t); } catch (e) {}
   if (!noExpand && isPhone() && sheetState === 'peek') setSheet('half');
@@ -2165,11 +2294,35 @@ function renderKline() {
   if (!lk) { el.textContent = tgtName(st.sel) + ' · 無路徑'; return; }
   el.innerHTML = `${tgtName(st.sel)} · RSRP <b style="color:${rsrpLv(lk.rsrp)[2]}">${fmt(lk.rsrp)}</b> · ${lk.hasI ? 'SINR' : 'SNR'} <b>${fmt(lk.hasI ? lk.sinr : lk.snr)}</b>${r.omni ? '' : ` · <b style="color:${SEC_COL[r.sector].toCssHexString()}">S${r.sector + 1}</b>`}`;
 }
+function sumMode() {
+  if ((curTab === 'ant' || curTab === 'cov') && st.area) return 'area';
+  if (curTab === 'pts' && ptsMode === 'meas' && st.v2 && st.v2.all) return 'meas';
+  return 'ue';
+}
+function dlt(v, base, unit) {
+  if (base == null || v == null || Math.abs(v - base) < 0.05) return unit;
+  const d = v - base; return `<span style="color:${d > 0 ? '#3ddc84' : '#ff8a8a'}">${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))}</span> ${unit}`;
+}
 function renderKpis() {
-  renderKline();
-  const loaded = !!(st.osm && st.viewer);
+  const loaded = !!(st.osm && st.viewer), mode = loaded ? sumMode() : 'ue';
+  $('#ues').hidden = loaded && !(curTab === 'pts' && ptsMode === 'ue') && !(curTab === 'ant' && mode === 'ue');
   $('#goQuick').hidden = loaded; $('#kpis').hidden = !loaded; $('#kline').hidden = !loaded;
   const el = $('#kpis');
+  if (loaded && mode === 'area') {
+    const a = st.area, b = st.areaBase || {};
+    el.innerHTML = kpi('≥ −110 dBm 面積', fmt(a.cov, 0) + '%', dlt(a.cov, b.cov, '覆蓋率')) + kpi('RSRP 中位數', fmt(a.med), dlt(a.med, b.med, 'dBm')) +
+      kpi('邊緣 RSRP', fmt(a.edge), dlt(a.edge, b.edge, '最差 10%')) + kpi((a.omni ? 'SNR' : 'SINR') + ' 中位數', fmt(a.sinr), dlt(a.sinr, b.sinr, 'dB'));
+    $('#kline').innerHTML = `覆蓋 <b>${fmt(a.cov, 0)}%</b> · 中位數 <b>${fmt(a.med)}</b> · 邊緣 <b>${fmt(a.edge)}</b> · SINR <b>${fmt(a.sinr)}</b>`;
+    return;
+  }
+  if (loaded && mode === 'meas') {
+    const v = st.v2;
+    el.innerHTML = kpi('平均誤差', (v.all.mean >= 0 ? '+' : '') + fmt(v.all.mean), `預測−實測 · ${v.all.n} 點`) + kpi('標準差', '±' + fmt(v.all.sd), 'dB') +
+      kpi('PCI 吻合', v.mrate == null ? '—' : Math.round(v.mrate * 100) + '%', '服務扇區') + kpi('LOS 誤差', v.los ? (v.los.mean >= 0 ? '+' : '') + fmt(v.los.mean) : '—', v.los ? `±${fmt(v.los.sd)} · ${v.los.n} 點` : '');
+    $('#kline').innerHTML = `路測 ${v.all.n} 點 · 誤差 <b>${v.all.mean >= 0 ? '+' : ''}${fmt(v.all.mean)}</b> ±${fmt(v.all.sd)} · PCI <b>${v.mrate == null ? '—' : Math.round(v.mrate * 100) + '%'}</b>`;
+    return;
+  }
+  renderKline();
   if (!st.osm || !st.viewer) { el.innerHTML = kpi('RSRP', '—', '載入後顯示') + kpi('SINR', '—', '') + kpi('服務扇區', '—', '') + kpi('RMS 時延擴展', '—', ''); return; }
   if (st.sel === 'all') {
     const L = SITE.ues.map((_, i) => link(traceUE(i))).filter(Boolean);
@@ -2234,7 +2387,7 @@ function setSheet(s) { sheetState = s; applySheet(); }
 })();
 (() => {
   let t = 'set'; try { t = localStorage.getItem('alaskaTab') || 'set'; } catch (e) {}
-  if (t === 'v2' && !HAS_V2) t = 'set';
+  if ((t === 'v2' || t === 'res') && !HAS_V2) t = t === 'res' ? 'cov' : 'set';
   if (isPhone()) t = 'set';
   setTab(t, true); sheetState = 'peek'; renderKpis();
   requestAnimationFrame(() => applySheet()); setTimeout(() => applySheet(), 300);
@@ -2244,9 +2397,16 @@ function setSheet(s) { sheetState = s; applySheet(); }
 const EN = {"下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。": "Downtilt = electrical tilt + mechanical tilt. RSRP is computed per port: per-port EIRP is the lower of (RU per-port output − feeder loss + antenna gain) and (SAS maxEirp × bandwidth ÷ number of TX ports), minus the extra loss. Sector antennas use the 3GPP TR 38.901 panel pattern (30 dB front-to-back); an omni antenna has the same gain in every direction.", "每個 UE 的分數 = RSRP 分數 × 權重 + SINR 分數 × (1 − 權重)。RSRP 從 −120 到 −80 dBm 線性對應 0–100 分，SINR 從 −5 到 25 dB 對應 0–100 分。": "Score per location = RSRP score × weight + SINR score × (1 − weight). RSRP from −120 to −80 dBm maps linearly to 0–100, SINR from −5 to 25 dB maps to 0–100.", "現場設定：天線離地 13 m、三扇區方位 30° / 150° / 270°（PCI 13 / 15 / 14）。點地圖上的實測點可以看該點的射線和比對結果。": "Site setup: antenna 13 m above ground, three sectors at 30° / 150° / 270° (PCI 13 / 15 / 14). Tap a measured point on the map to see its rays and comparison.", "地面視為平面（高度 h₀）。用 Google 寫實 3D 時，h₀ 取 UE 位置的模型表面高度中位數，只用來對齊疊加圖層；免金鑰模式 h₀ 為 0。": "Ground is treated as flat (height h₀). With Google photorealistic 3D, h₀ is the median model surface height at the UE positions and is used only to align the overlay; in keyless modes h₀ is 0.", "分數 = 各規則半徑內 RSRP 達標的點數加總，半徑外的點不計。距離以基站水平距離計算。RSRP 門檻要先校準過才有意義（見「V2 實測對照」）。": "Score = number of points within each rule's radius that meet its RSRP threshold, summed over rules; points outside the radius are ignored. Distance is horizontal distance from the BS. Calibrate first for the RSRP thresholds to be meaningful (see \"V2 measurement comparison\").", "接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。": "Received power is the power sum of all paths (phase ignored); RSRP assumes power is spread evenly over all subcarriers; SINR counts only co-channel interference from the other two sectors of this site, not other base stations.", "規格：17.7 dBi（0° 時 17.9、10° 時 17.6）、水平 65°、垂直 7°、遠端電子下傾 0–10°、前後比": "Specs: 17.7 dBi (17.9 at 0°, 17.6 at 10°), 65° horizontal, 7° vertical, remote electrical tilt 0–10°, front-to-back >", "UE（大點，標籤：編號 預測 RSRP）與 V2 實測點（小點，標籤：S 點號 實測 RSRP，灰＝無服務）：RSRP 分級": "UE (large dot, label: number + predicted RSRP) and V2 measured points (small dot, label: S number + measured RSRP, grey = no service): RSRP levels", "路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m。直射被建築擋住時，加上一條越過主要遮蔽屋頂邊緣的刀鋒繞射路徑（ITU-R P.526 近似）；未計牆角繞射與散射。只列比最強路徑弱 40 dB 以內者。": "Path geometry is computed from the mast centre; the panel offset only affects the display. UE height 1.5 m. When the direct path is blocked, a knife-edge diffraction path over the dominant rooftop edge is added (ITU-R P.526 approximation); corner diffraction and scattering are not modelled. Only paths within 40 dB of the strongest are listed.", "建築輪廓為網站內附資料（來自路測 KMZ 的 OSM 輪廓），沒有高度標籤，全部用預設高度，可點建築修改。": "Building outlines are bundled with the site (OSM outlines from the drive-test KMZ) with no height tags; all use the default height. Tap a building to change it.", "建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。": "Buildings are extruded OSM outlines; height comes from the height tag, else levels × 3.5 m, else the default.", "Cesium ion token 無效，或你的帳號沒有 Google 寫實 3D 這個 asset：": "Cesium ion token is invalid, or your account doesn't have the Google Photorealistic 3D asset: ", "射線用 OpenStreetMap 建築以鏡像法計算；背景可選衛星影像、街道圖或寫實 3D 建築。": "Rays are computed with the image method on OpenStreetMap buildings; the background can be satellite imagery, a street map or photorealistic 3D buildings.", "牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。": "Reflection loss: wall 6 dB, ground 3 dB. Penetration: 15 dB per exterior wall, 20 dB per roof; at most 4 crossings.", "二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。": "Second-order reflections only use walls visible from the BS (within 800 m) and from the UE (within 500 m), to speed up the calculation.", "射線 JSON 含每條路徑的經緯度、橢球高與損耗，之後可以換成 Sionna RT 的結果。": "The ray JSON has each path's lat/lon, ellipsoid height and loss; it can later be replaced with Sionna RT results.", "分數地圖：橫軸 S1 方位角 0–119°（三扇區每 120° 重複），縱軸電子下傾 0–": "Score map: horizontal axis S1 azimuth 0–119° (repeats every 120° for three sectors), vertical axis electrical tilt 0–", "OpenStreetMap 建築資料抓取失敗（伺服器忙碌或連線逾時），請過幾分鐘再按一次：": "Couldn't get OpenStreetMap buildings (server busy or timed out). Try again in a few minutes: ", "OSM 伺服器暫時連不上，改用網站內附的 OSM 建築（2026-11-06 匯出）。": "OSM servers are unreachable; using the bundled OSM buildings (exported 2026-11-06).", "m），方位 30° / 150° / 270°，PCI 13 / 15 / 14。": "m above the roof), azimuths 30° / 150° / 270°, PCI 13 / 15 / 14.", "Alpha Wireless AW3161-E-F-V2（3.3–3.8 GHz）": "Alpha Wireless AW3161-E-F-V2 (3.3–3.8 GHz)", "注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。": "Note: the BS coordinates aren't inside any OSM building; enter \"BS building height\" manually.", "黃點 LOS、藍點 NLOS；虛線為預測 = 實測，點在虛線上方代表模型高估。": "Yellow = LOS, blue = NLOS. The dashed line is predicted = measured; points above it mean the model overestimates.", "建築資料 © OpenStreetMap contributors（ODbL）": "Building data © OpenStreetMap contributors (ODbL)", "Google 寫實 3D，Map Tiles API（需 Google 金鑰）": "Google Photorealistic 3D via Map Tiles API (Google key needed)", "Google 寫實 3D，經 Cesium ion（需 ion token）": "Google Photorealistic 3D via Cesium ion (ion token needed)", "網站內附 OSM 建築（2026-11-06 匯出，1452 棟，建議）": "Bundled OSM buildings (exported 2026-11-06, 1452 buildings, recommended)", "SIB1 ss-PBCH-BlockPower (dBm，可留空)": "SIB1 ss-PBCH-BlockPower (dBm, optional)", "即時向 OpenStreetMap 查詢（較慢，伺服器常忙碌）": "Live OpenStreetMap query (slower, servers often busy)", "全向天線沒有方位角和下傾角可以調整，請先把天線型式改成三扇區。": "An omni antenna has no azimuth or tilt to adjust. Switch the antenna type to three sectors first.", "注意：這個位置超出已載入的建築範圍，附近建築不會參與計算。": "Note: this position is outside the loaded building area; nearby buildings won't be included.", "建築為網站內附的 OSM 資料（2026-11-06 匯出）": "Buildings are the bundled OSM data (exported 2026-11-06)", "OpenStreetMap 街道圖＋OSM 建築體（免金鑰）": "OpenStreetMap street map + OSM buildings (no key)", "金鑰無效，或這個專案還沒啟用 Map Tiles API：": "Invalid key, or Map Tiles API isn't enabled for this project: ", "18 dB、±45° 雙極化 4 埠（4×4 MIMO）。": "18 dB upper sidelobe suppression, ±45° dual-slant, 4 ports (4×4 MIMO).", "V2 實測對照（2026-11-04 路測，57 點）": "V2 measurement comparison (drive test 2026-11-04, 57 points)", "網站內附路測 KMZ 建築輪廓（861 棟，無標籤）": "Bundled drive-test KMZ outlines (861 buildings, no tags)", "OSM 伺服器暫時連不上，改用上次抓到的建築資料。": "OSM servers are unreachable; using the buildings downloaded last time.", "也納入 V2 實測點的位置（57 點，含無服務點）": "Also include the V2 measured locations (57 points, including no-service points)", "半徑內沒有評估點，請加大半徑或勾選至少一條規則。": "No evaluation points within the radius. Increase the radius or enable at least one rule.", "SAS 授權 maxEirp (dBm/MHz)": "SAS granted maxEirp (dBm/MHz)", "Google Map Tiles API 金鑰": "Google Map Tiles API key", "m）。套用後，地圖上綠點為達標、紅點為未達標。": "m). After applying, green dots on the map meet the target and red dots don't.", "連到其他業者（AT&T 850），視為無服務": "Camped on another operator (AT&T 850); counted as no service", "建築資料來源已變更，請按「載入地圖並計算」。": "Building source changed. Press \"Load map and calculate\".", "點中，模型預測 > −110 dBm": "points, the model predicts > −110 dBm at", "從 OpenStreetMap 抓取建築（": "Fetching buildings from OpenStreetMap (", "RU 每埠輸出功率，整個頻寬 (dBm)": "RU output power per port, whole band (dBm)", "OpenStreetMap 連線失敗：": "OpenStreetMap connection failed: ", "個子載波）。扣除額外損耗後總 EIRP": "subcarriers). Total EIRP after extra loss", "UE（點地圖上的 UE 也可以切換）": "UE (you can also tap a UE on the map)", "目前沒有 LOS 的實測點可以校準。": "There are no LOS measured points to calibrate with.", "已套用：天線離地 13 m（樓頂上": "Applied: antenna 13 m above ground (", "衛星影像＋OSM 建築體（免金鑰）": "Satellite imagery + OSM buildings (no key)", "最佳化評估格點（虛線圓為規則半徑）": "Optimizer evaluation points (dashed circles = rule radius)", "SIB1 宣告 SSB 每子載波": "SIB1 announces SSB per subcarrier", "，結果只對應這些位置與模型假設。": "; results only apply to these locations and model assumptions.", "選好背景後按「載入地圖並計算」。": "Choose a background, then press \"Load map and calculate\".", "這個位置抓不到地面，請再點一次。": "Couldn't find the ground there. Tap again.", "這個範圍內 OSM 沒有建築資料": "OSM has no buildings in this area", "OSM 樓層數 × 3.5 m": "OSM levels × 3.5 m", "發射埠數（共用 SAS 上限）": "TX ports (sharing the SAS limit)", "載入地圖並計算後顯示比對結果。": "Results appear after the map is loaded and calculated.", "無有效路徑（穿越超過 4 面）": "No valid path (more than 4 crossings)", "無高度資料時的建築高度 (m)": "Height for buildings without data (m)", "只評估室外（排除建築內的格點）": "Outdoor only (skip grid points inside buildings)", "垂直 3 dB 波束寬 (°)": "Vertical 3 dB beamwidth (°)", "°（往下越大），白框為最佳點。": "° (increasing downward); the white box marks the best point.", "UE 雜訊指數 NF (dB)": "UE noise figure NF (dB)", "。按「套用最佳設定」更新地圖。": ". Press \"Apply best settings\" to update the map.", "水平 3 dB 波束寬 (°)": "Horizontal 3 dB beamwidth (°)", "額外損耗：車內、校準 (dB)": "Extra loss: in-car, calibration (dB)", "半徑內 RSRP 達標的點最多": "Most points meeting RSRP within a radius", "這個檔案不是建築 JSON：": "This file isn't a building JSON: ", "實測與預測 RSRP 散布圖": "Measured vs predicted RSRP scatter plot", "三扇區面板（間隔 120°）": "Three-sector panels (120° apart)", "服務扇區與實測 PCI 一致": "Serving sector matches measured PCI", "SINR（另兩扇區同頻干擾）": "SINR (co-channel from other two sectors)", "射線顏色：該路徑的 RSRP": "Ray color: RSRP of that path", "自動最佳化天線方位角與下傾角": "Optimize antenna azimuth and tilt", "建築高度來源（點建築可修改）": "Building height source (tap a building to edit)", "模型預測（同 PCI 扇區）": "Model prediction (same-PCI sector)", "；模型預測最強扇區 RSRP": "; model's strongest-sector RSRP", "模型找不到路徑，不列入評分": "Model found no path; not scored", "棟無高度資料，用預設值），": "without height data use the default), ", "BS 所在建築高度 (m)": "BS building height (m)", "沒有穿越 4 面以內的路徑": "No path with 4 or fewer crossings", "用 LOS 點校準額外損耗": "Calibrate extra loss with LOS points", "在地圖上顯示評估點是否達標": "Show pass/fail of evaluation points on the map", "S1 方位角（正北順時針）": "S1 azimuth (clockwise from north)", "固定間隔 120°，一起轉": "Fixed 120° apart, rotate together", "OSM height 標籤": "OSM height tag", "實測 RSRP (dBm)": "Measured RSRP (dBm)", "搜尋最佳方位角與下傾角…": "Searching best azimuth and tilt…", "半徑內的 UE 與實測點": "UEs and measured points within the radius", "BS 到 UE 直線距離": "BS–UE straight-line distance", "RSRP 分級（dBm）": "RSRP levels (dBm)", "饋線與接頭損耗 (dB)": "Feeder and connector loss (dB)", "載入內附 OSM 建築…": "Loading bundled OSM buildings…", "請按「載入地圖並計算」。": "Press \"Load map and calculate\".", "地面橢球高 h₀ (m)": "Ground ellipsoid height h₀ (m)", "全部（預測 − 實測）": "All (predicted − measured)", "誤差（預測 − 實測）": "Error (predicted − measured)", "實測點，平均誤差歸零）": "measured points, mean error set to zero)", "CBRS 站點多徑射線": "CBRS Site Multipath Rays", "dBm，加天線增益後約": "dBm, about ", "30 dB、上旁瓣抑制": "30 dB, upper sidelobe suppression >", "各扇區接收 (dBm)": "Received per sector (dBm)", "室內（OSM 建築內）": "Indoor (inside an OSM building)", "RSRP（每個子載波）": "RSRP (per subcarrier)", "改回 OSM／預設高度": "Reset to OSM/default height", "地圖上每個 UE 顯示": "Paths shown per UE", "面板離桅杆中心 (m)": "Panel offset from mast (m)", "實測 RSRP（PCI": "Measured RSRP (PCI", "機械下傾（支架）(°)": "Mechanical tilt (bracket) (°)", "子載波間距 (SCS)": "Subcarrier spacing (SCS)", "改用本機建築 JSON": "Use a local building JSON", "已載入本機建築資料：": "Loaded local building data: ", "套用 V2 現場設定": "Apply V2 site setup", "中心頻率 (MHz)": "Center frequency (MHz)", "通用面板（自訂參數）": "Generic panel (custom parameters)", "上旁瓣抑制 (dB)": "Upper sidelobe suppression (dB)", "dBm，SAS 上限": "dBm, SAS limit", "所有位置平均分數最高": "Highest average score", "緯度或經度格式不對。": "Latitude or longitude is not valid.", "內附建築檔讀取失敗（": "Couldn't read the bundled building file (", "電子下傾上限 (°)": "Max electrical tilt (°)", "dBm。時延解析度約": "dBm. Delay resolution about", "顯示 OSM 建築體": "Show OSM buildings", "三扇區固定 120°": "Three sectors fixed 120°", "沒有可比對的實測點。": "No measured points to compare.", "天線高於樓頂 (m)": "Antenna above roof (m)", "請先載入地圖並計算。": "Load the map and calculate first.", "天線增益 (dBi)": "Antenna gain (dBi)", "dBm（模型目前用": "dBm (the model currently uses", "顯示被擋住的射線段": "Show blocked ray segments", "在這台電腦記住金鑰": "Remember the key on this device", "dBm，每個子載波": "dBm, per subcarrier", "下載射線 JSON": "Download ray JSON", "電子下傾 eRET": "Electrical tilt eRET", "，受 SAS 限制": ", limited by SAS", "下載建築 JSON": "Download building JSON", "在地圖上顯示實測點": "Show measured points on the map", "沒有可評估的位置。": "No locations to evaluate.", "載入內附建築輪廓…": "Loading bundled building outlines…", "搜尋方位角與下傾角": "Searching azimuth and tilt", "+ 57 個實測點": "+ 57 measured points", "MHz 總接收功率": "MHz total received power", "沒有資料，用預設值": "No data, default used", "在地圖上點新位置": "Tap a new position on the map", "格點間距 (m)": "Grid spacing (m)", "S3 的 PCI": "S3 PCI", "S2 的 PCI": "S2 PCI", "S1 的 PCI": "S1 PCI", "電子下傾 (°)": "Electrical tilt (°)", "SINR 前→後": "SINR before→after", "RSRP 前→後": "RSRP before→after", "全部 UE 摘要": "Summary of all UEs", "建築高度（公尺）": "Building height (m)", "服務扇區（最強）": "Serving sector (strongest)", "RMS 時延擴展": "RMS delay spread", "已套用最佳設定。": "Best settings applied.", "前後比 (dB)": "Front-to-back ratio (dB)", "地圖上顯示的扇區": "Sector shown on the map", "沒有高度相關標籤": "no height-related tags", "計算評估點的射線": "Tracing rays for evaluation points", "各扇區微調：第": "Per-sector refinement: round", "dBm；雜訊底": "dBm; noise floor", "點地圖選 UE": "Tap the map to choose a new position for UE", "載入地圖並計算": "Load map and calculate", "最差的位置優先": "Worst location first", "筆你設定的高度": "of your building heights", "路徑（0 條）": "Paths (0)", "BS 所在建築": "BS building", "最佳化計算中…": "Optimizing…", "方位角 (°)": "Azimuth (°)", "自訂天線參數。": "Custom antenna parameters.", "各扇區獨立設定": "Set each sector separately", "MHz、SCS": "MHz, SCS", "損耗（含天線）": "Loss (incl. antenna)", "RSRP 權重": "RSRP weight", "附加時延 ns": "Excess delay ns", "半徑內均勻格點": "Uniform grid within the radius", "m · 來源：": "m · source: ", "BS 天線離地": "BS antenna height", "每埠：設備能力": "Per port: equipment capability", "建議電子下傾": "Suggested electrical tilt", "你設定的高度": "Height you set", "最差位置分數": "Worst location score", "用全部點校準": "Calibrate with all points", "計算二次反射": "Second-order reflections", "NLOS 點": "NLOS points", "最佳化完成：": "Optimization done: ", "目前顯示 S": "showing S", "自動（最強）": "Auto (strongest)", "，並套用其中": ", applied ", "套用最佳設定": "Apply best settings", "功率時延剖面": "Power delay profile", "全部 UE：": "All UEs: ", "實測無服務的": "Of the", "半徑 (m)": "Radius (m)", "最佳化失敗：": "Optimization failed: ", "直射 LOS": "Direct LOS", "還原原始位置": "Restore original position", "總 EIRP": "Total EIRP", "實測 SNR": "Measured SNR", "最強路徑損耗": "Strongest path loss", "的新位置。": ".", "原始標籤：": "Raw tags: ", "UE 位置": "UE location", "路徑（顯示": "Paths (showing", "（另加機械": "(plus mechanical", "LOS 點": "LOS points", "dB，最大": "dB, largest", "面牆，計算": "walls, computed in", "各扇區獨立": "Each sector separately", "實測點 S": "Measured point S", "開始最佳化": "Run optimization", "發生錯誤：": "Error: ", "m 內 ≥": "m ≥", "例如 −5": "e.g. −5", "條最強路徑": "strongest", "建議方位角": "Suggested azimuth", "計算射線…": "Tracing rays…", "格點（間距": "grid points (spacing", "條，共找到": ", found", "回傳空資料": "returned no data", "dBm）。": "dBm).", "載入地圖…": "Loading map…", "平均分數": "Average score", "模型假設": "Model assumptions", "個 UE": "UEs", "尚未計算": "Not calculated yet", "個埠平分": "ports sharing", "最佳化後": "After", "✕ 關閉": "✕ Close", "建築資料": "Building data", "天線型式": "Antenna type", "最強路徑": "Strongest path", "通道頻寬": "Channel bandwidth", "套用座標": "Apply coordinates", "扇區配置": "Sector layout", "建築高度": "Building height", "kHz：": "kHz: ", "搜尋方式": "Search mode", "↑ 預測": "↑ predicted", "額外損耗": "extra loss", "組設定，": "settings, ", "附加時延": "Excess delay", "通道摘要": "channel summary", "棟建築（": "buildings (", "dBm（": "dBm (", "扇區不符": "sector mismatch", "天線型號": "Antenna model", "，並還原": ", restored", "），採用": "), using", "一次反射": "1st-order reflection", "各 UE": "Each UE", "請先輸入": "Enter ", "二次反射": "2nd-order reflection", "達標點數": "Points meeting target", "個位置（": "locations (", "基站天線": "BS antenna", "共評估": "Evaluated", "＋穿透": " + penetration", "無遮擋": "unobstructed", "下傾角": "Tilt", "評估點": "Evaluation points", "ns。": "ns.", "無服務": "No service", "RB（": "RB (", "ms。": "ms.", "輪，S": ", S", "無路徑": "No path", "未達標": "Fail", "完成：": "Done: ", "實測點": "measured points", "，重試": ", retry", "距離": "Distance", "結果": "Results", "室外": "Outdoor", "移到": "moved to", "牆面": "wall", "個點": "points", "規則": "Rule", "啟動": "Start", "實測": "Measured", "還原": "Reset", "分數": "Score", "評估": "Evaluated", "格點": "Grid point", "長度": "Length", "套用": "Apply", "穿越": "crossing", "直射": "Direct", "（依": "(from", "頂）": "roof)", "預測": "Predicted", "回應": "responded", "位置": "Location", "全部": "All", "緯度": "Latitude", "面（": "crossings (", "，由": ", ", "內外": "door and outdoor", "經度": "Longitude", "目標": "Goal", "地面": "ground", "普通": "Fair", "背景": "Background", "個室": "in", "關閉": "Close", "建築": "Building", "圖例": "Legend", "條）": ")", "資料": "Data", "超過": "over", "平均": "mean", "很差": "Very poor", "很好": "Excellent", "他網": "Other net", "參數": "Parameters", "°）": "°)", "誤差": "Error", "）…": ")…", "達標": "Pass", "室內": "Indoor", "相對": "Relative", "天線": "Antenna", "金鑰": "Key", "路徑": "Paths", "全向": "Omni", "目前": "Current", "通道": "Channel", "外": "outdoor", "個": "", "棟": "", "弱": "Weak", "點": "points", "牆": "walls", "好": "Good", "版本": "Version", "設定": "Setup", "最佳化": "Optimize", "圖層與圖例": "Layers & legend", "在上方選一個 UE（點地圖上的 UE 也可以），就能修改它的位置。": "Pick a UE above (or tap one on the map) to change its position.", "載入後顯示": "after loading", "平均 RSRP": "Avg RSRP", "最差 RSRP": "Worst RSRP", "平均 SINR": "Avg SINR", "有效 UE": "UEs with a path", "服務扇區": "Serving sector", "展開或收合面板": "Expand or collapse the panel", "面板分頁": "Panel tabs", "CBRS 射線": "CBRS Rays", " · 下傾 ": " · tilt ", "下傾 ": "tilt ", "RSRP · ": "RSRP · ", "全部 · 平均 RSRP": "All · avg RSRP", " · 最差 ": " · worst ", "最差": "worst", " · 無路徑": " · no path", "載入中…": "Loading…", "覆蓋熱力圖": "Coverage heatmap", "顯示指標": "Show", "RSRP（最強扇區）": "RSRP (strongest sector)", "不透明度": "Opacity", "範圍半徑 (m)": "Radius (m)", "含二次反射（較準，但慢約 10 倍）": "Include 2nd-order reflections (more accurate, about 10× slower)", "計算熱力圖": "Calculate heatmap", "清除熱力圖": "Clear heatmap", "停止": "Stop", "只計算室外格點。算完後轉動天線方位角或下傾角、改功率，熱力圖會即時更新。點地圖上的熱力圖可以看該點的數值。": "Only outdoor grid points are calculated. After it's done, the heatmap updates live when you change azimuth, tilt or power. Tap the heatmap to see the value at that spot.", "顯示覆蓋熱力圖": "Show coverage heatmap", "覆蓋熱力圖：": "Coverage heatmap: ", "RSRP ≥ −110 dBm 的面積": "Area with RSRP ≥ −110 dBm", "RSRP 中位數": "Median RSRP", "邊緣 RSRP（最差 10%）": "Edge RSRP (worst 10%)", "SINR 中位數": "Median SINR", "SNR 中位數": "Median SNR", "範圍半徑": "Radius", "個 · 間距 ": " · spacing ", "面積比例為半徑內室外格點的比例。數值未扣「額外損耗」以外的校準，建議先用 V2 實測校準。": "Area shares are shares of outdoor grid points within the radius. No calibration other than \"extra loss\" is applied; calibrate with the V2 measurements first.", "建築、天線高度或頻率已變更，請重新計算熱力圖。": "Buildings, antenna height or frequency changed. Recalculate the heatmap.", "已停止計算熱力圖。": "Heatmap calculation stopped.", "熱力圖計算失敗：": "Heatmap calculation failed: ", "一次反射＋穿透": "first-order reflections + penetration", "含二次反射": "with second-order reflections", "模型找不到路徑。": "the model finds no path.", "這一點（距基站 ": "This spot (", " m）": " m from the BS)", "距基站 ": "", "色階": "Color scale", "平滑漸層": "Smooth gradient", "分級格點": "Grid by level", "顯示 UE": "Show UEs", "顯示射線": "Show rays", "只看熱力圖": "Heatmap only", "還沒有熱力圖：到「結果」分頁按「計算熱力圖」。": "No heatmap yet: go to the Results tab and press \"Calculate heatmap\".", "屋頂繞射": "Rooftop diffraction", "繞射損耗 ": "diffraction loss "};
 Object.assign(EN, {"高雄站點多徑射線（事前評估）": "Kaohsiung Site Multipath Rays (pre-deployment)", "高雄 射線": "Kaohsiung rays", "（事前評估）": " (pre-deployment)", "（含路測）": " (with drive test)", "高雄": "Kaohsiung", "評估站點": "Site", "基站緯度": "BS latitude", "基站經度": "BS longitude", "在地圖上點選基站": "Pick BS on map", "套用座標": "Apply coordinates", "頻段（TDD）": "Band (TDD)", "國土測繪中心正射影像＋OSM 建築體（免金鑰，臺灣）": "NLSC orthophoto + OSM buildings (no key, Taiwan)", "國土測繪中心通用版電子地圖＋OSM 建築體（免金鑰，臺灣）": "NLSC e-map + OSM buildings (no key, Taiwan)", "即時查詢 OpenStreetMap（之後可下載內附）": "Live OpenStreetMap query (download to bundle later)", "這個站點的座標只是區域位置，不是實際基站位置：請在地圖上點選或輸入候選基站位置。": "This site's coordinate marks the area only, not the actual BS. Pick or enter a candidate BS position.", "基站位置已更新，按「載入地圖並計算」。": "BS position updated. Press \"Load map and compute\".", "先按「載入地圖並計算」，再在地圖上點選基站。": "Press \"Load map and compute\" first, then pick the BS on the map.", "點地圖選基站位置（點在建築上，天線會放在該建築屋頂）。": "Tap the map to place the BS (tap a building to put the antenna on its roof).", "基站座標格式不對。": "The BS coordinates are not valid.", "國土測繪中心圖磚載入失敗（可能是網路或伺服器限制），可改用「衛星影像」背景。": "NLSC tiles failed to load (network or server restriction). Try the satellite background instead.", "RSRP／SINR 以下行功率計算，TDD 上下行時槽比例不影響這兩個值。": "RSRP and SINR use downlink power, so the TDD UL/DL slot ratio does not change them.", "中心頻率不在此頻段內。": "The center frequency is outside this band.", "半徑內的 UE": "UEs within the radius", "這個站點沒有內附建築檔": "This site has no bundled building file", "這個站點沒有內附建築輪廓": "This site has no bundled building outlines"});
 Object.assign(EN, {"地形高程": "Terrain", "地形關閉：地面視為水平面。": "Terrain off: the ground is treated as flat.", "載入地圖時會一起抓地形高程（AWS Terrain Tiles，資料解析度約 30 m）。": "Terrain heights load with the map (AWS Terrain Tiles, about 30 m source resolution).", "載入地形高程…": "Loading terrain…", "高程圖磚逾時": "terrain tile timed out", "高程圖磚讀取失敗": "terrain tile failed to load", "這裡沒有高程資料": "no elevation data here", "範圍太大": "area too large"});
+Object.assign(EN, {"站點與基站": "Site and BS", "地圖與建築": "Map and buildings", "設備與頻段": "Equipment and band", "模型與校準": "Model and calibration", "站點": "Site", "點位": "Points", "覆蓋": "Coverage", "資料": "Data", "地形": "Terrain", "路測": "Drive test", "檔案": "Files", "模型假設": "Model assumptions", "規劃 UE": "Planned UEs", "路測點": "Drive-test points", "（未匯入）": " (not imported)", "疊上路測": "Drive-test overlay", "不疊": "Off", "實測值": "Measured", "預測−實測": "Predicted − measured", "路測比對": "Drive-test comparison", "誤差最大的點": "Largest errors", "到點位看全部路測點": "See all drive-test points in Points", "用 LOS 路測點校準額外損耗": "Calibrate extra loss with LOS drive-test points", "用全部路測點校準": "Calibrate with all drive-test points", "校準會調整「額外損耗」，讓預測 − 實測的平均誤差歸零。": "Calibration adjusts \"Extra loss\" so the mean predicted − measured error becomes zero.", "沒有路測資料，無法校準。": "No drive-test data, so calibration is unavailable. ", "尚未匯入。事前評估不需要路測；後期優化有路測後，可以用來校準模型、在覆蓋圖上比對。": "Not imported. Pre-deployment evaluation needs no drive test; once one exists for optimization, use it to calibrate the model and compare on the coverage map.", "沒有路測資料。到「站點 › 資料」可以看路測狀態。": "No drive-test data. See its status under Site › Data.", "路測點用和熱力圖相同的 RSRP 分級顏色：點的顏色和底下熱力圖相近，代表預測準。": "Drive-test points use the same RSRP colors as the heatmap: where a point matches the color beneath it, the prediction is accurate.", "路測點顏色為預測 − 實測：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內，灰色＝實測無服務。": "Point color shows predicted − measured: orange = model too high, blue = too low, white = within ±3 dB, gray = no service measured.", "點表格或地圖上的路測點，可以看該點的射線。地圖上的顏色：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內。": "Tap a row or a drive-test point on the map to see its rays. Map colors: orange = model too high, blue = too low, white = within ±3 dB.", "≥ −110 dBm 面積": "≥ −110 dBm area", "覆蓋率": "coverage", "邊緣 RSRP": "Edge RSRP", "最差 10%": "worst 10%", "SINR 中位數": "SINR median", "SNR 中位數": "SNR median", "RSRP 中位數": "RSRP median", "平均誤差": "Mean error", "標準差": "Std dev", "PCI 吻合": "PCI match", "LOS 誤差": "LOS error", "預測−實測 · ": "predicted − measured · ", "地形關閉": "terrain off", "地形載入失敗": "terrain failed to load", "地形：載入後顯示": "terrain: shown after loading", "建築：載入後顯示": "buildings: shown after loading", "路測未匯入": "no drive test", "（借用值）": " (borrowed value)", "反射（含二次）": "reflection (incl. 2nd order)", "＋穿透": " + penetration", "＋繞射": " + diffraction", "＋地形": " + terrain", "樓頂": "roof", "中位數": "median", "邊緣": "edge"});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/建築 (\d+) 棟（(\d+) 棟無高度）/, 'Buildings $1 ($2 without height)'],
+  [/地形高差 ([\d.]+) m/, 'terrain relief $1 m'],
+  [/路測 (\d+) 點(?!（)/, 'drive test $1 points'],
+  [/^路測比對（(.+?)，(\d+) 點）$/, 'Drive-test comparison ($1, $2 points)'],
+  [/^V2 路測 (.+?) · (\d+) 點（(\d+) 點有 RSRP）。現場設定：天線離地 13 m、方位 30° \/ 150° \/ 270°（PCI 13 \/ 15 \/ 14）。$/, 'V2 drive test $1 · $2 points ($3 with RSRP). Field setup: antenna 13 m above ground, azimuth 30° / 150° / 270° (PCI 13 / 15 / 14).'],
+  [/額外損耗目前 ([\d.]+) dB 是借用 Anchorage 車內實測的校準值。/, 'The current extra loss of $1 dB is borrowed from the Anchorage in-car drive-test calibration.'],
   [/地形：BS 地面海拔約 ([−\d.]+) m；半徑 (\d+) m 內相對 BS 地面 ([−\d.]+) 到 \+([−\d.]+) m，高差 ([\d.]+) m/, 'Terrain: BS ground about $1 m above sea level; within $2 m the ground is $3 to +$4 m relative to it, a $5 m range'],
   [/，接近平坦，影響很小。/, '. Nearly flat, little effect.'],
   [/，有些起伏，對遠處或低處的 UE 有影響。/, '. Some relief; affects distant or low-lying UEs.'],
