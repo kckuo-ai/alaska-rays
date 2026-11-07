@@ -232,6 +232,9 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
   <p id="bhInfo"></p>
   <div class="rw">
     <input type="number" id="bhIn" step="0.5" min="1" inputmode="decimal" aria-label="建築高度（公尺）"><span class="u">m</span>
+    <select id="bhMat" aria-label="建築材料"></select>
+  </div>
+  <div class="rw">
     <button type="button" class="primary" id="bhSave">套用</button>
     <button type="button" id="bhClear">還原</button>
   </div>
@@ -246,6 +249,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
     <div id="layers" class="mlegend" hidden>
       <div class="lchk">
         <label class="chk"><input type="checkbox" id="showB" checked>顯示 OSM 建築體</label>
+        <label class="f" style="font-size:13px">建築顏色<select id="bColor"><option value="src">高度來源</option><option value="mat">材料</option></select></label>
         <label class="chk"><input type="checkbox" id="ghost" checked>顯示被擋住的射線段</label>
         <label class="chk"><input type="checkbox" id="showM" checked>在地圖上顯示實測點</label>
         <label class="chk"><input type="checkbox" id="showH" checked>顯示覆蓋熱力圖</label>
@@ -385,6 +389,10 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <label class="chk"><input type="checkbox" id="order2" checked>計算二次反射</label>
         <label class="chk"><input type="checkbox" id="diffOn" checked>屋頂繞射</label>
       </div>
+      <div class="row2" style="margin-top:10px">
+        <label class="f">建築材料（穿透損耗）<select id="matMode"><option value="auto">依建築類型自動判斷</option><option value="wood">全部木造</option><option value="mixed">全部玻璃＋混凝土</option><option value="concrete">全部混凝土</option><option value="irr">全部鍍膜玻璃帷幕</option></select></label>
+      </div>
+      <p class="sub" id="matNote" style="margin-top:6px"></p>
       <div class="row2" id="vegRow" style="margin-top:10px" hidden>
         <label class="chk" style="align-self:end"><input type="checkbox" id="vegOn">植被衰減（樹冠，試作）</label>
         <label class="f">樹葉狀態<select id="leaf"><option value="1">有葉（夏季）</option><option value="0.5">無葉（落葉樹，衰減 × 0.5）</option></select></label>
@@ -401,6 +409,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
         <li>建築為 OSM 輪廓拉伸；高度取 height 標籤，其次 樓層數 × 3.5 m，都沒有時用預設值。</li>
         <li>牆面反射 6 dB、地面 3 dB；穿過每道外牆 15 dB、屋頂 20 dB；最多 4 次穿越。</li>
         <li>下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算：每埠 EIRP 取「RU 每埠輸出 − 饋線損耗 + 天線增益」與「SAS 授權 maxEirp × 頻寬 ÷ 發射埠數」兩者較低者，再扣額外損耗。扇區天線用 3GPP TR 38.901 的面板方向圖（前後比 30 dB），全向時增益處處相同。</li><li>接收功率為各路徑功率相加（不計相位）；RSRP 假設功率平均分到所有子載波；SINR 只算同站另兩個扇區的同頻干擾，不含其他基站。</li><li>二次反射只計算基站看得到（800 m 內）與 UE 看得到（500 m 內）的牆面，以加快計算。</li><li>路徑幾何以桅杆中心計算，面板偏移只影響顯示。UE 高 1.5 m。直射被建築擋住時，加上一條越過主要遮蔽屋頂邊緣的刀鋒繞射路徑（ITU-R P.526 近似）；未計牆角繞射與散射。只列比最強路徑弱 40 dB 以內者。</li>
+        <li>建築穿透損耗依材料計算（3GPP TR 38.901 表 7.4.3-1）：木造 4.85＋0.12f、混凝土 5＋4f、玻璃＋混凝土與鍍膜玻璃帷幕用 38.901 的低／高損耗組合；f 為 GHz，屋頂再加 5 dB。美國站點的住宅預設木造，臺灣站點預設混凝土。</li>
         <li>地形用 AWS Terrain Tiles（約 30 m）：建築、UE 放在地面上，穿過地面的路徑捨棄，山脊和屋頂一起取最強的一處算繞射。關閉地形時地面為水平面。h₀ 是 BS 地面在顯示圖層中的高度；用 Google 寫實 3D 時取 UE 位置模型表面高度（扣掉地形）的中位數，只用來對齊疊加圖層。</li>
       </ul>
       <p class="sub" style="margin-top:8px">建築資料 © OpenStreetMap contributors（ODbL）</p></details>
@@ -597,6 +606,15 @@ const RT = (() => {
   }
   // vegetation: canopy height above ground on a regular grid (null = none). Trees attenuate (Weissberger),
   // they are not treated as specular reflectors; the canopy top also competes as a diffraction edge.
+  // building penetration by material (3GPP TR 38.901 Table 7.4.3-1, f in GHz); roof = wall + 5 dB
+  const MATL = { wood: f => 4.85 + 0.12 * f, glass: f => 2 + 0.2 * f, concrete: f => 5 + 4 * f, irrGlass: f => 23 + 0.3 * f };
+  const mixL = (a, wa, b, wb, f) => 5 - 10 * Math.log10(wa * Math.pow(10, -MATL[a](f) / 10) + wb * Math.pow(10, -MATL[b](f) / 10));
+  function wallLoss(mat, f) {
+    if (mat === 'wood') return MATL.wood(f);
+    if (mat === 'concrete') return MATL.concrete(f);
+    if (mat === 'irr') return mixL('irrGlass', 0.7, 'concrete', 0.3, f);   // 38.901 high-loss: IRR glass + concrete
+    return mixL('glass', 0.3, 'concrete', 0.7, f);                         // 'mixed', 38.901 low-loss: glass + concrete
+  }
   let CAN = null;
   function setCanopy(c) { CAN = c && c.h && c.nx > 1 ? c : null; }
   function canopyAt(x, z) {
@@ -633,7 +651,7 @@ const RT = (() => {
       poly.forEach(([x, z]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); });
       const base = TER ? Math.min(...poly.map(([x, z]) => ground(x, z))) : 0;
       src.y0 = base;
-      const b = { src: si, y0: base, h: base + src.h, poly, x0, x1, z0, z1, faces: [] }, bi = B.length; B.push(b);
+      const b = { src: si, y0: base, h: base + src.h, mat: src.mat || null, poly, x0, x1, z0, z1, faces: [] }, bi = B.length; B.push(b);
       for (let i = 0; i < poly.length; i++) {
         const a = poly[i], c = poly[(i + 1) % poly.length], dx = c[0] - a[0], dz = c[1] - a[1], len = Math.hypot(dx, dz);
         if (len < 0.3) continue;
@@ -786,7 +804,12 @@ const RT = (() => {
       p.d = d; p.tau = d / C * 1e9;
       let pl = 20 * Math.log10(4 * Math.PI * d / lam);
       for (const f of p.via) pl += f.kind === 'ground' ? o.reflG : o.reflW;
-      for (const c of p.pen) pl += c.kind === 'roof' ? o.penR : o.penW;
+      p.penDb = 0;
+      for (const c of p.pen) {
+        const m = B[c.b] && B[c.b].mat, w = m && o.mat !== false ? wallLoss(m, o.fHz / 1e9) : null;
+        const l = w == null ? (c.kind === 'roof' ? o.penR : o.penW) : (c.kind === 'roof' ? w + 5 : w);
+        pl += l; p.penDb += l;
+      }
       if (p.dl) pl += p.dl;
       if (p.veg > 0.5) { p.vl = vegLoss(p.veg, o.fHz / 1e9) * (o.vegK ?? 1); pl += p.vl; } else p.vl = 0;
       p.pl = pl;
@@ -798,7 +821,7 @@ const RT = (() => {
     }
     return { paths, total: paths.length };
   }
-  return { setBuildings, setTerrain, setCanopy, canopyAt, ground, terrBlocked, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
+  return { wallLoss, setBuildings, setTerrain, setCanopy, canopyAt, ground, terrBlocked, trace, buildingAt, building: i => B[i], count: () => B.length, faceCount: () => F.length - 1 };
 })();
 </script>
 
@@ -814,13 +837,13 @@ const SITES = {
       [61.1735872, -149.8857155], [61.1721515, -149.8827259], [61.1754019, -149.8838769], [61.1746329, -149.8828644],
       [61.1736982, -149.8812983], [61.1726030, -149.8789537], [61.1758706, -149.8926454], [61.1724572, -149.8923047]
     ].map(([lat, lon]) => ({ lat, lon })),
-    v2scen: 'car',
+    v2scen: 'car', matProfile: 'us',
     defaults: { defH: 6 },   // lidar median 5.9 m for buildings the survey didn't measure
     bsrc: ['osmb', 'kmz', 'osm'], files: { osmb: 'buildings_osm.json', kmz: 'buildings_kmz.json', lidar: 'lidar/heights_anchorage.json', canopy: 'lidar/canopy_anchorage.json' }, osmbDate: '2026-11-06',
     v2: { tower: [61.1728742, -149.88421488], utc: "2026-11-04", rows: [[38,61.1720903,-149.8844744,-99,-11,17,15,0],[39,61.1709414,-149.8844269,-106,-11,9,15,0],[40,61.1706616,-149.8832569,-112,-11,11,15,0],[41,61.1699155,-149.8830957,-119,-12,2,15,0],[42,61.1691207,-149.8821148,-119,-12,5,15,0],[43,61.1680679,-149.8815798,-126,-14,5,15,0],[44,61.1672085,-149.8811563,-127,-15,0,15,0],[45,61.1667477,-149.8805588,null,null,null,null,0],[46,61.1665482,-149.8806022,null,null,null,null,0],[47,61.1665937,-149.8834488,null,null,null,null,0],[48,61.1674583,-149.886345,null,null,null,null,0],[49,61.1695553,-149.886265,-106,-11,5,15,0],[50,61.1725342,-149.8862741,-104,-17,-3,15,0],[51,61.173332,-149.8863359,-101,-11,14,14,0],[52,61.1736887,-149.888122,-96,-11,21,14,0],[53,61.1736797,-149.8959425,-124,-14,1,14,0],[54,61.1740745,-149.897883,-122,-13,3,14,0],[55,61.1776181,-149.8979025,-128,-15,-4,14,0],[56,61.1793577,-149.8978881,null,null,null,null,0],[57,61.1806851,-149.8954412,null,null,null,null,0],[58,61.1806626,-149.8904118,null,null,null,null,0],[59,61.1798431,-149.8865554,null,null,null,null,0],[60,61.1784078,-149.8865239,-129,-17,-6,14,0],[61,61.1764676,-149.8865006,-129,-18,-7,14,0],[62,61.17485,-149.8864259,-110,-11,12,14,0],[63,61.1739195,-149.8864099,-90,-11,22,14,0],[64,61.1735454,-149.8853869,-98,-11,19,14,2],[65,61.1735464,-149.8827531,-100,-11,23,13,0],[66,61.17355,-149.8800515,-106,-11,14,13,0],[67,61.1735427,-149.8757785,-125,-14,1,13,0],[68,61.1735337,-149.8707143,null,null,null,null,0],[69,61.1694855,-149.8682557,null,null,null,null,0],[70,61.1669182,-149.8682296,null,null,null,null,1],[71,61.1664797,-149.8685392,null,null,null,null,1],[72,61.166531,-149.8770578,null,null,null,null,1],[73,61.166504,-149.8798525,null,null,null,null,0],[74,61.1689889,-149.8819143,-121,-12,4,15,0],[75,61.1722469,-149.883019,-104,-13,2,15,0],[76,61.1730742,-149.8827681,null,null,null,null,0],[77,61.1730725,-149.8825892,-98,-11,20,13,0],[78,61.1730745,-149.8821971,-100,-11,9,13,0],[79,61.1730675,-149.8813284,-105,-11,14,13,0],[80,61.1730692,-149.8802258,-111,-11,10,13,0],[81,61.1730687,-149.8792339,-113,-11,9,13,0],[82,61.1734858,-149.8789338,-107,-11,16,13,0],[83,61.1741597,-149.8789363,-115,-12,5,13,0],[84,61.1753023,-149.878938,-120,-12,4,13,0],[85,61.1765661,-149.8789464,-121,-12,5,13,0],[86,61.1771691,-149.8789436,null,null,null,null,0],[87,61.1772325,-149.8830126,-124,-14,2,13,0],[88,61.1767915,-149.8831544,-123,-13,1,13,0],[89,61.175969,-149.8831334,-120,-13,5,13,0],[90,61.1747627,-149.8831234,-113,-12,4,13,0],[91,61.1739158,-149.8831078,-108,-11,7,13,0],[92,61.1736246,-149.8839572,-99,-11,12,13,0],[93,61.1732053,-149.8843833,-100,-13,4,14,0],[94,61.1728113,-149.8845061,-107,-16,0,14,0]] }
   },
   kaohsiung: {
-    name: '高雄', store: 'khh', band: 'n79', tw: true, approx: true,
+    name: '高雄', matProfile: 'tw', store: 'khh', band: 'n79', tw: true, approx: true,
     bs: { lat: 22.7815028, lon: 120.4187782 },
     area: { lat: 22.7815028, lon: 120.4187782, r: 700 },
     ues: ringUEs(22.7815028, 120.4187782, [[100, 0], [0, 100], [-100, 0], [0, -100], [212, 212], [-212, 212], [-212, -212], [212, -212]]),
@@ -991,7 +1014,7 @@ function parseOSM(json) {
       if (m.role === 'outer' && m.geometry && m.geometry.length > 3) { const g = m.geometry; if (g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon) rings.push(g); }
     });
     const hh = heightOf(tags);
-    rings.forEach(g => out.push({ id: el.type + '/' + el.id, name: tags.name || '', h: hh.h, src: hh.src, tagH: tags.height || '', levels: tags['building:levels'] || '', ll: g.map(p => [p.lon, p.lat]) }));
+    rings.forEach(g => out.push({ id: el.type + '/' + el.id, name: tags.name || '', h: hh.h, src: hh.src, tagH: tags.height || '', levels: tags['building:levels'] || '', btype: tags.building || '', ll: g.map(p => [p.lon, p.lat]) }));
   }
   return out;
 }
@@ -1000,6 +1023,26 @@ function parseOSM(json) {
 let bsBuilding = -1;
 st.hOv = (() => { try { return JSON.parse(localStorage.getItem(SK('BH')) || '{}') || {}; } catch (e) { return {}; } })();
 const saveOv = () => { try { localStorage.setItem(SK('BH'), JSON.stringify(st.hOv)); } catch (e) {} };
+st.matOv = (() => { try { return JSON.parse(localStorage.getItem(SK('Mat')) || '{}') || {}; } catch (e) { return {}; } })();
+const saveMat = () => { try { localStorage.setItem(SK('Mat'), JSON.stringify(st.matOv)); } catch (e) {} };
+const MATS = { wood: { t: '木造', c: '#c8a46e' }, mixed: { t: '玻璃＋混凝土', c: '#8fb3d9' }, concrete: { t: '混凝土', c: '#9aa0a6' }, irr: { t: '鍍膜玻璃帷幕', c: '#5b7bd5' } };
+const B_RES = new Set(['house', 'detached', 'residential', 'semidetached_house', 'terrace', 'bungalow', 'cabin', 'garage', 'garages', 'shed', 'hut', 'farm', 'static_caravan']);
+const B_APT = new Set(['apartments', 'dormitory']);
+const B_COM = new Set(['commercial', 'retail', 'office', 'supermarket', 'hotel', 'school', 'university', 'college', 'hospital', 'civic', 'public', 'government', 'church', 'kindergarten', 'train_station']);
+const B_IND = new Set(['industrial', 'warehouse', 'manufacture', 'hangar']);
+// Building practice differs by region: US low-rise housing is wood-frame, Taiwan housing is reinforced concrete.
+function autoMat(btype, h, area) {
+  const t = btype || '';
+  if ((SITE.matProfile || 'tw') === 'us') {
+    if (B_RES.has(t)) return 'wood';
+    if (B_APT.has(t)) return h <= 14 ? 'wood' : 'mixed';
+    if (B_COM.has(t) || B_IND.has(t)) return 'mixed';
+    return h <= 14 && area <= 3000 ? 'wood' : 'mixed';     // no type tag: US light-frame (Type V) up to ~4 storeys; big boxes are steel/concrete
+  }
+  if (B_COM.has(t)) return 'mixed';
+  return 'concrete';
+}
+const polyArea = p => Math.abs(p.reduce((a, q, i) => { const r = p[(i + 1) % p.length]; return a + q[0] * r[1] - r[0] * q[1]; }, 0)) / 2;
 function buildModel() {
   const defH = +$('#defH').value || 9;
   const { r } = centerAndRadius();
@@ -1007,7 +1050,10 @@ function buildModel() {
   const list = st.osm.map(b => {
     const ov = st.hOv[b.id], lh = L && L[b.id];
     // priority: your edit > lidar > OSM height / levels > default
-    return { h: ov != null ? ov : lh ? lh[0] : (b.h ?? defH), src: ov != null ? 'user' : lh ? 'lidar' : b.src, poly: b.ll.map(([lon, lat]) => toLocal(lon, lat)) };
+    const h = ov != null ? ov : lh ? lh[0] : (b.h ?? defH), poly = b.ll.map(([lon, lat]) => toLocal(lon, lat));
+    const mode = $('#matMode').value, auto = autoMat(b.btype, h, polyArea(poly));
+    const mat = st.matOv[b.id] || (mode === 'auto' ? auto : mode);
+    return { h, src: ov != null ? 'user' : lh ? 'lidar' : b.src, poly, mat, matAuto: auto, matUser: !!st.matOv[b.id] };
   });
   RT.setTerrain(terrOn() && demFresh() ? st.dem : null);
   RT.setCanopy(canopyGrid());
@@ -1017,7 +1063,7 @@ function buildModel() {
   st.list = list; st.gridSig = '';
   if (bsBuilding >= 0) $('#bsH').value = list[bsBuilding].h.toFixed(1);
   st.cache = {};
-  syncLidarNote();
+  syncLidarNote(); syncMatNote();
 }
 function txPos() {
   const L = bsBuilding >= 0 ? st.list[bsBuilding] : null;
@@ -1162,15 +1208,16 @@ const HSRC = {
   default: { c: '#8a96a3', t: '沒有資料，用預設值' }
 };
 function drawBuildings() {
-  const key = st.h0 + '|' + $('#showB').checked + '|' + bsBuilding + '|' + st.list.map(b => b.h + b.src + (b.y0 || 0).toFixed(1)).join(',');
+  const key = st.h0 + '|' + $('#showB').checked + '|' + bsBuilding + '|' + st.list.map(b => b.h + b.src + (b.y0 || 0).toFixed(1) + b.mat).join(',') + '|' + $('#bColor').value;
   if (key === st.bKey) return;
   st.bKey = key;
   bldDS.entities.removeAll();
   if (!$('#showB').checked) return;
   st.osm.forEach((b, i) => {
-    const L = st.list[i], base = Cesium.Color.fromCssColorString(HSRC[L.src].c), isBS = i === bsBuilding;
-    const fill = st.tileset ? base.withAlpha(L.src === 'default' ? .12 : .3)
-      : Cesium.Color.lerp(Cesium.Color.fromCssColorString('#e6eaee'), base, L.src === 'default' ? .15 : .55, new Cesium.Color());
+    const L = st.list[i], byMat = $('#bColor').value === 'mat', base = Cesium.Color.fromCssColorString(byMat ? MATS[L.mat].c : HSRC[L.src].c), isBS = i === bsBuilding;
+    const k = byMat ? .75 : L.src === 'default' ? .15 : .55;
+    const fill = st.tileset ? base.withAlpha(byMat ? .35 : L.src === 'default' ? .12 : .3)
+      : Cesium.Color.lerp(Cesium.Color.fromCssColorString('#e6eaee'), base, k, new Cesium.Color());
     const e = bldDS.entities.add({ polygon: {
       hierarchy: Cesium.Cartesian3.fromDegreesArray(b.ll.flat()), height: st.h0 + (L.y0 || 0), extrudedHeight: st.h0 + (L.y0 || 0) + L.h,
       material: fill, outline: true,
@@ -1184,18 +1231,26 @@ function openBSheet(i) {
   const raw = [b.tagH && 'height=' + b.tagH, b.levels && 'building:levels=' + b.levels].filter(Boolean).join('，') || '沒有高度相關標籤';
   $('#bhInfo').innerHTML = `OSM ${b.id}<br>目前 ${fmt(L.h)} m · 來源：${HSRC[L.src].t}<br>原始標籤：${raw}`;
   $('#bhIn').value = L.h.toFixed(1);
-  $('#bhClear').hidden = L.src !== 'user';
+  const fG = opts().fHz / 1e9;
+  $('#bhMat').innerHTML = `<option value="auto">材料：自動（${MATS[L.matAuto].t}）</option>` + Object.entries(MATS).map(([k, m]) => `<option value="${k}">材料：${m.t}（牆 ${fmt(RT.wallLoss(k, fG))} dB）</option>`).join('');
+  $('#bhMat').value = st.matOv[b.id] || 'auto';
+  $('#bhInfo').innerHTML += `<br>材料：${MATS[L.mat].t}${L.matUser ? '（你設定的）' : $('#matMode').value === 'auto' ? '（自動判斷）' : '（全部套用）'} · 牆 ${fmt(RT.wallLoss(L.mat, fG))} dB、屋頂 ${fmt(RT.wallLoss(L.mat, fG) + 5)} dB${b.btype ? ` · building=${b.btype}` : ''}`;
+  $('#bhClear').hidden = L.src !== 'user' && !L.matUser;
   $('#bhClear').title = '改回 OSM／預設高度';
   st.bEdit = i; $('#bsheet').hidden = false;
 }
 $('#bhClose').onclick = () => { $('#bsheet').hidden = true; st.bEdit = null; };
 $('#bhSave').onclick = () => {
   const v = +$('#bhIn').value; if (!(v > 0) || st.bEdit == null) return;
-  st.hOv[st.osm[st.bEdit].id] = v; saveOv(); $('#bsheet').hidden = true; refresh(true);
+  const id = st.osm[st.bEdit].id, L = st.list[st.bEdit];
+  if (Math.abs(v - L.h) > 0.05 || L.src === 'user') { st.hOv[id] = v; saveOv(); }
+  const m = $('#bhMat').value; if (m === 'auto') delete st.matOv[id]; else st.matOv[id] = m; saveMat();
+  st.cache = {}; $('#bsheet').hidden = true; refresh(true);
 };
 $('#bhClear').onclick = () => {
   if (st.bEdit == null) return;
-  delete st.hOv[st.osm[st.bEdit].id]; saveOv(); $('#bsheet').hidden = true; refresh(true);
+  const id = st.osm[st.bEdit].id; delete st.hOv[id]; delete st.matOv[id]; saveOv(); saveMat();
+  st.cache = {}; $('#bsheet').hidden = true; refresh(true);
 };
 const RAY_MIN = -125, RAY_MAX = -70;
 const SEC_COL = ['#ffb347', '#7ee081', '#c792ea'].map(c => Cesium.Color.fromCssColorString(c));
@@ -1383,6 +1438,7 @@ syncAntUI();
 syncLbNote();
 $('#mlegendBody').innerHTML = `射線顏色：該路徑的 RSRP<div class="bar"></div><div class="ends"><span>${RAY_MIN}</span><span>${RAY_MAX} dBm</span></div>` +
   `<div style="margin-top:6px">建築高度來源（點建築可修改）</div><div class="bl">` + Object.values(HSRC).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>' +
+  `<div style="margin-top:6px">建築材料（「建築顏色」選材料時）</div><div class="bl">` + Object.values(MATS).map(x => `<i style="background:${x.c}"></i><span>${x.t}</span>`).join('') + '</div>' +
   `<div style="margin-top:6px">最佳化評估格點（虛線圓為規則半徑）</div><div class="bl"><i style="background:#3ddc84;border-radius:50%"></i><span>達標</span><i style="background:#ff5e5e;border-radius:50%"></i><span>未達標</span></div>` +
   `<div style="margin-top:6px">UE（大點，標籤：編號 預測 RSRP）與 V2 實測點（小點，標籤：S 點號 實測 RSRP，灰＝無服務）：RSRP 分級</div><div class="bl">` + RSRP_LV.map((x, k) => `<i style="background:${x[2]};border-radius:50%"></i><span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)} dBm</span>`).join('') + '</div>';
 // Number fields recalc 0.5 s after typing stops, and only when the value actually changed
@@ -1715,6 +1771,12 @@ $('#bsH').addEventListener('change', () => {
 });
 $('#h0').addEventListener('change', () => { st.h0 = +$('#h0').value; applyTerrainDisplay(); refresh(false); });
 $('#showB').addEventListener('change', () => { if (st.osm) drawBuildings(); });
+$('#bColor').addEventListener('change', () => { if (st.osm) drawBuildings(); });
+$('#matMode').addEventListener('change', () => {
+  syncMatNote(); if (!st.osm || !st.viewer) return;
+  const hadHeat = !!st.heat; st.cache = {}; st.heat = null; st.heatVals = null; st.snap = null; st.base = null;
+  refresh(true); syncMatNote(); syncSums(); status('建築材料已更新。' + (hadHeat ? '熱力圖已清除，請重新計算。' : ''));
+});
 $('#ghost').addEventListener('change', () => { drawRays(); highlight(null); });
 
 function download(name, obj) {
@@ -2070,12 +2132,22 @@ function drawCanopy() {
 }
 $('#showC').addEventListener('change', drawCanopy);
 
+/* ===== building materials ===== */
+function syncMatNote() {
+  const fG = (+$('#fMHz').value || 3625) / 1000, w = k => fmt(RT.wallLoss(k, fG));
+  const prof = (SITE.matProfile || 'tw') === 'us' ? '美國 4 層以下的住宅、公寓和小型建築多為木構造：高 14 m 以下、面積 3000 m² 以下判為木造，大量體與標為商業／工業的建築為玻璃＋混凝土' : '臺灣建築多為鋼筋混凝土：商業類為玻璃＋混凝土，其餘為混凝土';
+  let cnt = '';
+  if (st.list) { const c = {}; st.list.forEach(b => { c[b.mat] = (c[b.mat] || 0) + 1; }); cnt = '目前：' + Object.entries(MATS).filter(([k]) => c[k]).map(([k, m]) => `${m.t} ${c[k]} 棟`).join('、') + '。'; }
+  $('#matNote').textContent = `每面牆的穿透損耗（${$('#fMHz').value} MHz，3GPP TR 38.901）：木造 ${w('wood')} dB、玻璃＋混凝土 ${w('mixed')} dB、混凝土 ${w('concrete')} dB、鍍膜玻璃帷幕 ${w('irr')} dB；屋頂再加 5 dB。自動判斷：${prof}。${cnt}點建築可以個別修改。`;
+}
+
 /* ===== sites, bands, BS position ===== */
 function syncBand(fromUser) {
   const b = curBand();
   let f = +$('#fMHz').value;
   if (fromUser || !(f >= b.lo && f <= b.hi)) { if (!(f >= b.lo && f <= b.hi)) { f = b.f; $('#fMHz').value = f; } }
   $('#fMHz').min = b.lo; $('#fMHz').max = b.hi;
+  if (typeof syncMatNote === 'function' && $('#matNote')) syncMatNote();
   const scs = +$('#scs').value;
   [...$('#bw').options].forEach(o => { o.disabled = !b.bws.includes(+o.value) || !NRB[scs][+o.value]; });
   if ($('#bw').selectedOptions[0].disabled) {
@@ -2130,7 +2202,7 @@ async function moveBS(lat, lon) {
     $('#showM').closest('label').hidden = true;
     const zo = $('#zPts').querySelector('option[value="sites"]'); if (zo) zo.textContent = '半徑內的 UE';
   }
-  syncBSFields(); syncBand(false); syncLbNote(); syncExtraNote(); syncSums(); syncCalHint(); syncLidarNote(); syncVeg();
+  syncBSFields(); syncBand(false); syncLbNote(); syncExtraNote(); syncSums(); syncCalHint(); syncLidarNote(); syncVeg(); syncMatNote();
   $('#band').addEventListener('change', () => { $('#fMHz').value = curBand().f; syncBand(true); syncLbNote(); st.cache = {}; refresh(false); });
   ['#bw', '#scs', '#fMHz'].forEach(sel => $(sel).addEventListener('change', () => syncBand(false)));
   $('#bsApply').onclick = () => moveBS(+$('#bsLat').value, +$('#bsLon').value);
@@ -2495,7 +2567,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 23:10';
+const APP_VERSION = '2026-11-07 23:50';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -2658,9 +2730,14 @@ Object.assign(EN, {"站點覆蓋評估": "Site coverage evaluation"});
 Object.assign(EN, {"終端損耗 (dB)": "Device loss (dB)", "規劃情境": "Planning scenario", "戶外手持（+0 dB）": "Outdoor handheld (+0 dB)", "車內（+8 dB）": "In-car (+8 dB)", "站點校準修正 (dB)": "Site calibration correction (dB)", "清除校準修正": "Clear calibration correction", "還沒用這個站點的路測校準。": "Not calibrated with this site's drive test yet.", "這個站點沒有路測，校準修正為 0；預設值和其他站點相同。": "This site has no drive test, so the correction is 0; defaults are the same as at every other site.", "沒有路測資料，無法校準；校準修正維持 0 dB。": "No drive-test data, so calibration is unavailable; the correction stays at 0 dB.", "校準只調整「站點校準修正」，讓路測點的預測 − 實測平均誤差歸零；終端損耗與規劃情境不變。": "Calibration changes only the site calibration correction so the mean predicted − measured error at drive-test points becomes zero; device loss and planning scenario stay as set.", "戶外手持": "outdoor handheld", "車內": "in-car"});
 Object.assign(EN, {"光達量測（NOAA 2015）": "Lidar measured (NOAA 2015)", "使用光達建築高度": "Use lidar building heights", "載入地圖時一起讀取。": "Read when the map loads.", "光達高度檔讀取失敗，改用 OSM 標籤與預設高度。": "Couldn't read the lidar height file; using OSM tags and default heights.", "已改用光達建築高度。": "Now using lidar building heights. ", "已改回 OSM 標籤與預設高度。": "Back to OSM tags and default heights. ", "高度": "Heights"});
 Object.assign(EN, {"山脊繞射": "Ridge diffraction", "植被衰減（樹冠，試作）": "Vegetation loss (canopy, trial)", "樹葉狀態": "Foliage", "有葉（夏季）": "In leaf (summer)", "無葉（落葉樹，衰減 × 0.5）": "Leaf-off (deciduous, loss × 0.5)", "顯示樹冠（光達）": "Show tree canopy (lidar)", "樹冠高度格網會在載入地圖時讀取（光達）。": "The canopy height grid (lidar) loads with the map.", "植被衰減已關閉。": "Vegetation loss off. ", "＋植被": " + vegetation"});
+Object.assign(EN, {"建築材料（穿透損耗）": "Building material (penetration loss)", "依建築類型自動判斷": "Automatic by building type", "全部木造": "All wood", "全部玻璃＋混凝土": "All glass + concrete", "全部混凝土": "All concrete", "全部鍍膜玻璃帷幕": "All IRR glass curtain wall", "木造": "wood", "玻璃＋混凝土": "glass + concrete", "混凝土": "concrete", "鍍膜玻璃帷幕": "IRR glass curtain wall", "建築顏色": "Building colour", "高度來源": "Height source", "材料": "Material", "建築材料（「建築顏色」選材料時）": "Building material (when Building colour is Material)", "建築材料已更新。": "Building materials updated. ", "（你設定的）": " (set by you)", "（自動判斷）": " (automatic)", "（全部套用）": " (applied to all)", "建築穿透損耗依材料計算（3GPP TR 38.901 表 7.4.3-1）：木造 4.85＋0.12f、混凝土 5＋4f、玻璃＋混凝土與鍍膜玻璃帷幕用 38.901 的低／高損耗組合；f 為 GHz，屋頂再加 5 dB。美國站點的住宅預設木造，臺灣站點預設混凝土。": "Building penetration loss depends on material (3GPP TR 38.901 Table 7.4.3-1): wood 4.85 + 0.12f, concrete 5 + 4f, glass + concrete and IRR glass use the 38.901 low-/high-loss combinations; f in GHz, roofs add 5 dB. US sites default housing to wood, Taiwan sites to concrete."});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^每面牆的穿透損耗（(\d+) MHz，3GPP TR 38\.901）：木造 ([\d.]+) dB、玻璃＋混凝土 ([\d.]+) dB、混凝土 ([\d.]+) dB、鍍膜玻璃帷幕 ([\d.]+) dB；屋頂再加 5 dB。自動判斷：(美國|臺灣).*?。(目前：(.*?)。)?點建築可以個別修改。$/,
+    (m, f, a, b, c, d, p, x, cnt) => `Penetration loss per wall (${f} MHz, 3GPP TR 38.901): wood ${a} dB, glass + concrete ${b} dB, concrete ${c} dB, IRR glass curtain wall ${d} dB; roofs add 5 dB. Automatic: ${p === '美國' ? 'in the US, housing, apartments and small buildings up to 4 storeys are mostly light wood-frame, so buildings up to 14 m tall and 3000 m² are wood, while big boxes and buildings tagged commercial/industrial are glass + concrete' : 'Taiwan buildings are mostly reinforced concrete, so commercial buildings are glass + concrete and the rest concrete'}. ${cnt ? 'Now: ' + cnt.replace(/木造/g, 'wood').replace(/玻璃＋混凝土/g, 'glass + concrete').replace(/鍍膜玻璃帷幕/g, 'IRR glass').replace(/混凝土/g, 'concrete').replace(/ (\d+) 棟/g, ' $1').replace(/、/g, ', ') + '. ' : ''}Tap a building to change it.`],
+  [/^材料：自動（(.+)）$/, (m, a) => `Material: automatic (${{ '木造': 'wood', '玻璃＋混凝土': 'glass + concrete', '混凝土': 'concrete', '鍍膜玻璃帷幕': 'IRR glass' }[a] || a})`],
+  [/^材料：(木造|玻璃＋混凝土|混凝土|鍍膜玻璃帷幕)（牆 ([\d.]+) dB）$/, (m, a, w) => `Material: ${{ '木造': 'wood', '玻璃＋混凝土': 'glass + concrete', '混凝土': 'concrete', '鍍膜玻璃帷幕': 'IRR glass' }[a]} (wall ${w} dB)`],
   [/^樹冠來自 NOAA 2015 光達（2 m 格網）：樹冠覆蓋 (\d+)% 的範圍，樹高中位數 ([\d.]+) m。.*$/, 'Canopy from the NOAA 2015 lidar (2 m grid): trees cover $1% of the area, median tree height $2 m. A path through the crown layer gets Weissberger attenuation by depth (about 7 dB for 10 m, 12 dB for 20 m), and the canopy top competes as a diffraction edge; trees are not treated as reflectors. Checked against the V2 drive test: LOS bias drops only about 1 dB while NLOS becomes 3–4 dB more pessimistic and the spread grows, so it is off by default.'],
   [/穿過樹冠 (\d+) m（([\d.]+) dB）/, 'through $1 m of canopy ($2 dB)'],
   [/^植被衰減已開啟（(有葉|無葉)）。/, (m, a) => `Vegetation loss on (${a === '有葉' ? 'in leaf' : 'leaf-off'}). `],
