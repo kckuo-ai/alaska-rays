@@ -369,10 +369,14 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <h2><button type="button" class="ctog" aria-expanded="true">模型與校準<i aria-hidden="true"></i></button></h2>
       <p class="secsum" id="secModelSum"></p>
       <div class="row2">
-        <label class="f">額外損耗：車內、校準 (dB)<input type="number" id="extraL" value="0" step="1"></label>
+        <label class="f">終端損耗 (dB)<input type="number" id="devL" value="14" step="1"></label>
+        <label class="f">規劃情境<select id="scen"><option value="hand">戶外手持（+0 dB）</option><option value="car">車內（+8 dB）</option></select></label>
+        <label class="f">站點校準修正 (dB)<input type="number" id="calAdj" value="0" step="0.1"></label>
+        <input type="hidden" id="extraL" value="14">
         <label class="f">無高度資料時的建築高度 (m)<input type="number" id="defH" value="9" step="1"></label>
         <label class="f">地面橢球高 h₀ (m)<input type="number" id="h0" step="0.5"></label>
       </div>
+      <p class="sub" id="extraNote" style="margin-top:6px"></p>
       <div class="tools" style="margin-top:10px">
         <label class="chk"><input type="checkbox" id="order2" checked>計算二次反射</label>
         <label class="chk"><input type="checkbox" id="diffOn" checked>屋頂繞射</label>
@@ -770,6 +774,7 @@ const SITES = {
       [61.1735872, -149.8857155], [61.1721515, -149.8827259], [61.1754019, -149.8838769], [61.1746329, -149.8828644],
       [61.1736982, -149.8812983], [61.1726030, -149.8789537], [61.1758706, -149.8926454], [61.1724572, -149.8923047]
     ].map(([lat, lon]) => ({ lat, lon })),
+    v2scen: 'car',
     bsrc: ['osmb', 'kmz', 'osm'], files: { osmb: 'buildings_osm.json', kmz: 'buildings_kmz.json' }, osmbDate: '2026-11-06',
     v2: { tower: [61.1728742, -149.88421488], utc: "2026-11-04", rows: [[38,61.1720903,-149.8844744,-99,-11,17,15,0],[39,61.1709414,-149.8844269,-106,-11,9,15,0],[40,61.1706616,-149.8832569,-112,-11,11,15,0],[41,61.1699155,-149.8830957,-119,-12,2,15,0],[42,61.1691207,-149.8821148,-119,-12,5,15,0],[43,61.1680679,-149.8815798,-126,-14,5,15,0],[44,61.1672085,-149.8811563,-127,-15,0,15,0],[45,61.1667477,-149.8805588,null,null,null,null,0],[46,61.1665482,-149.8806022,null,null,null,null,0],[47,61.1665937,-149.8834488,null,null,null,null,0],[48,61.1674583,-149.886345,null,null,null,null,0],[49,61.1695553,-149.886265,-106,-11,5,15,0],[50,61.1725342,-149.8862741,-104,-17,-3,15,0],[51,61.173332,-149.8863359,-101,-11,14,14,0],[52,61.1736887,-149.888122,-96,-11,21,14,0],[53,61.1736797,-149.8959425,-124,-14,1,14,0],[54,61.1740745,-149.897883,-122,-13,3,14,0],[55,61.1776181,-149.8979025,-128,-15,-4,14,0],[56,61.1793577,-149.8978881,null,null,null,null,0],[57,61.1806851,-149.8954412,null,null,null,null,0],[58,61.1806626,-149.8904118,null,null,null,null,0],[59,61.1798431,-149.8865554,null,null,null,null,0],[60,61.1784078,-149.8865239,-129,-17,-6,14,0],[61,61.1764676,-149.8865006,-129,-18,-7,14,0],[62,61.17485,-149.8864259,-110,-11,12,14,0],[63,61.1739195,-149.8864099,-90,-11,22,14,0],[64,61.1735454,-149.8853869,-98,-11,19,14,2],[65,61.1735464,-149.8827531,-100,-11,23,13,0],[66,61.17355,-149.8800515,-106,-11,14,13,0],[67,61.1735427,-149.8757785,-125,-14,1,13,0],[68,61.1735337,-149.8707143,null,null,null,null,0],[69,61.1694855,-149.8682557,null,null,null,null,0],[70,61.1669182,-149.8682296,null,null,null,null,1],[71,61.1664797,-149.8685392,null,null,null,null,1],[72,61.166531,-149.8770578,null,null,null,null,1],[73,61.166504,-149.8798525,null,null,null,null,0],[74,61.1689889,-149.8819143,-121,-12,4,15,0],[75,61.1722469,-149.883019,-104,-13,2,15,0],[76,61.1730742,-149.8827681,null,null,null,null,0],[77,61.1730725,-149.8825892,-98,-11,20,13,0],[78,61.1730745,-149.8821971,-100,-11,9,13,0],[79,61.1730675,-149.8813284,-105,-11,14,13,0],[80,61.1730692,-149.8802258,-111,-11,10,13,0],[81,61.1730687,-149.8792339,-113,-11,9,13,0],[82,61.1734858,-149.8789338,-107,-11,16,13,0],[83,61.1741597,-149.8789363,-115,-12,5,13,0],[84,61.1753023,-149.878938,-120,-12,4,13,0],[85,61.1765661,-149.8789464,-121,-12,5,13,0],[86,61.1771691,-149.8789436,null,null,null,null,0],[87,61.1772325,-149.8830126,-124,-14,2,13,0],[88,61.1767915,-149.8831544,-123,-13,1,13,0],[89,61.175969,-149.8831334,-120,-13,5,13,0],[90,61.1747627,-149.8831234,-113,-12,4,13,0],[91,61.1739158,-149.8831078,-108,-11,7,13,0],[92,61.1736246,-149.8839572,-99,-11,12,13,0],[93,61.1732053,-149.8843833,-100,-13,4,14,0],[94,61.1728113,-149.8845061,-107,-16,0,14,0]] }
   },
@@ -779,7 +784,7 @@ const SITES = {
     area: { lat: 22.7815028, lon: 120.4187782, r: 700 },
     ues: ringUEs(22.7815028, 120.4187782, [[100, 0], [0, 100], [-100, 0], [0, -100], [212, 212], [-212, 212], [-212, -212], [212, -212]]),
     bsrc: ['osm'], files: {},
-    defaults: { fMHz: 4850, bw: 100, scs: 30, ruP: 37, nPort: 4, antModel: 'generic', antG: 14, hpbw: 65, vpbw: 10, cableL: 1, defH: 10, extraL: 22, mast: 3 }
+    defaults: { fMHz: 4850, bw: 100, scs: 30, ruP: 37, nPort: 4, antModel: 'generic', antG: 14, hpbw: 65, vpbw: 10, cableL: 1, defH: 10, mast: 3 }
   }
 };
 const SITE_ID = (() => {
@@ -825,6 +830,8 @@ function lbCfg() {
   return { bw, scs, nrb, nre, nf, dev, sas, eirpCap, extra, eirpTot, eirpRE: eirpTot - 10 * Math.log10(nre), noise, sasLimited: sas < dev };
 }
 const eirpTot = () => lbCfg().eirpTot;
+const isMeasKey = i => typeof i === 'string' && i[0] === 'm';
+const eirpFor = i => eirpTot() - (isMeasKey(i) ? measDelta() : 0);
 function link(r) {
   const c = lbCfg(), S = r.prx[r.sector];
   if (!Number.isFinite(S)) return null;
@@ -1008,7 +1015,7 @@ function patt(a, k, p) {
   return -Math.min(-(AH + AV), a.fb);
 }
 function traceUE(i) {
-  const g = geomUE(i), a = antCfg(), eirp = eirpTot(), K = a.mode === 'omni' ? 1 : 3, per = [];
+  const g = geomUE(i), a = antCfg(), eirp = eirpFor(i), K = a.mode === 'omni' ? 1 : 3, per = [];
   for (let k = 0; k < K; k++) {
     const ps = g.paths.map(p => { const gain = patt(a, k, p); return Object.assign({}, p, { gain, pl: p.pl - gain }); });
     per.push({ ps, prx: ps.length ? 10 * Math.log10(ps.reduce((s, p) => s + Math.pow(10, (eirp - p.pl) / 10), 0)) : -Infinity });
@@ -1033,13 +1040,13 @@ function describe(p) {
   if (pen) parts.push(`穿越 ${pen} 面（${p.pen.filter(c => c.kind === 'wall').length} 牆 ${p.pen.filter(c => c.kind === 'roof').length} 頂）`);
   return { label, detail: parts.join('；') || '無遮擋' };
 }
-function stats(kept) {
+function stats(kept, key) {
   if (!kept.length) return null;
   const lin = kept.map(p => Math.pow(10, p.rel / 10)), sp = lin.reduce((a, b) => a + b, 0);
   const mean = kept.reduce((s, p, i) => s + lin[i] * p.tau, 0) / sp;
   const rms = Math.sqrt(kept.reduce((s, p, i) => s + lin[i] * (p.tau - mean) ** 2, 0) / sp);
   const best = kept[0];
-  const eirp = eirpTot();
+  const eirp = eirpFor(key);
   const prxTot = 10 * Math.log10(kept.reduce((s, p) => s + Math.pow(10, (eirp - p.pl) / 10), 0));
   return { rms, best, prxTot, tmin: Math.min(...kept.map(p => p.tau)) };
 }
@@ -1196,7 +1203,7 @@ function renderPanel() {
       `<div style="grid-column:1/-1"><dt>RSRP 分級（dBm）</dt><dd style="font:12px var(--body)">${RSRP_LV.map((x, k) => `<span class="sec" style="background:${x[2]}"></span>${x[1]} ${k === 4 ? '< −110' : '≥ ' + fmt(x[0], 0)}`).join('　')}</dd></div>`;
     $('#tblTitle').textContent = '各 UE';
     $('#tbl').innerHTML = '<tr><th>UE</th><th>距離</th><th>RSRP</th><th>SINR / SNR</th><th>RMS DS</th></tr>' + SITE.ues.map((_, i) => {
-      const r = traceUE(i), s = stats(r.kept), d = Math.hypot(...uePos(i).map((v, k) => v - tx[k]));
+      const r = traceUE(i), s = stats(r.kept, i), d = Math.hypot(...uePos(i).map((v, k) => v - tx[k]));
       const secTag = r.omni ? '' : `<small><span class="sec" style="background:${SEC_COL[r.sector].toCssHexString()}"></span>S${r.sector + 1}</small>`;
       if (!s) return `<tr class="p" data-u="${i}"><td>UE ${i + 1}${r.indoor ? '<small>室內</small>' : ''}</td><td>${fmt(d, 0)} m</td><td style="font-family:inherit" colspan="3">無有效路徑（穿越超過 4 面）</td></tr>`;
       const lk = link(r), lv = rsrpLv(lk.rsrp);
@@ -1239,7 +1246,7 @@ function renderPanel() {
         (lk.hasI ? `<div><dt>SINR（另兩扇區同頻干擾）</dt><dd>${fmt(lk.sinr)}<small>dB</small></dd></div>` : ''); })() +
     `<div><dt>RMS 時延擴展</dt><dd>${fmt(s.rms)}<small>ns</small></dd></div>`;
   $('#tblTitle').textContent = `路徑（顯示 ${kept.length} 條，共找到 ${r.total} 條）`;
-  const eirp = eirpTot();
+  const eirp = eirpFor(st.sel);
   $('#tbl').innerHTML = '<tr><th>路徑</th><th>長度</th><th>附加時延</th><th>損耗（含天線）</th><th>相對</th></tr>' + kept.map((p, i) => {
     const ds = describe(p);
     return `<tr class="p" data-i="${i}"><td><span class="sw" style="background:${drawn[i] ? drawn[i].col.toCssHexString() : '#888'}"></span>${ds.label}<small>${ds.detail}</small></td>` +
@@ -1419,7 +1426,8 @@ function optPrep(keys) {
   const c = lbCfg(), eirp = c.eirpTot;
   return keys.map(i => {
     const g = geomUE(i);
-    return { az: g.paths.map(p => p.az), el: g.paths.map(p => p.el), lin: g.paths.map(p => Math.pow(10, (eirp - p.pl) / 10)) };
+    const e = eirp - (isMeasKey(i) ? measDelta() : 0);
+    return { az: g.paths.map(p => p.az), el: g.paths.map(p => p.el), lin: g.paths.map(p => Math.pow(10, (e - p.pl) / 10)) };
   });
 }
 function optEval(U, azs, tilts, hp, vp, w, goal, nre, noiseLin, fb = 30, slav = 30, zone = null) {
@@ -1617,11 +1625,10 @@ function calibrate(which) {
   if (!st.osm) { status('請先載入地圖並計算。', true); return; }
   const x = which === 'los' ? st.v2 && st.v2.los : st.v2 && st.v2.all;
   if (!x) { status(which === 'los' ? '目前沒有 LOS 的實測點可以校準。' : '沒有可比對的實測點。', true); return; }
-  const before = +$('#extraL').value || 0, after = Math.round((before + x.mean) * 10) / 10;
-  $('#extraL').value = after; $('#extraL').dataset.last = String(after);
-  st.cal = { which, n: x.n }; saveExtra();
-  syncLbNote(); refresh(false); syncCalHint(); syncSums();
-  toast(`額外損耗 ${fmt(before)} → <b>${fmt(after)} dB</b>（依 ${x.n} 個${which === 'los' ? ' LOS ' : ''}實測點，平均誤差歸零）`);
+  const before = +$('#calAdj').value || 0, after = Math.round((before + x.mean) * 10) / 10;
+  $('#calAdj').value = after; st.cal = { which, n: x.n };
+  applyExtra();
+  toast(`站點校準修正 ${fmt(before)} → ${fmt(after)} dB（依 ${x.n} 個${which === 'los' ? ' LOS ' : ''}路測點，平均誤差歸零）`);
 }
 $('#calLos').onclick = () => calibrate('los');
 $('#calAll').onclick = () => calibrate('all');
@@ -1647,8 +1654,10 @@ $('#tbl').addEventListener('click', e => {
   const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
 });
 ['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
-['#ruP', '#nPort', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf', '#extraL'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
-$('#extraL').addEventListener('change', () => { st.cal = null; saveExtra(); syncCalHint(); });
+['#ruP', '#nPort', '#antG', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
+$('#devL').addEventListener('change', () => applyExtra());
+$('#scen').addEventListener('change', () => applyExtra());
+$('#calAdj').addEventListener('change', () => { st.cal = null; applyExtra(); });
 $('#order2').addEventListener('change', () => { st.cache = {}; refresh(false); });
 $('#diffOn').addEventListener('change', () => { st.cache = {}; if (st.osm && st.viewer) refresh(false); });
 $('#defH').addEventListener('change', () => refresh(true));
@@ -1849,7 +1858,7 @@ function syncSums() {
     (HAS_V2 ? `路測 ${V2.rows.length} 點` : '路測未匯入'));
   const lc = lbCfg();
   T('secDevSum', `${$('#band').value} · ${$('#fMHz').value} MHz · ${lc.bw} MHz／${lc.scs} kHz · ${lc.nrb} RB · RU ${$('#ruP').value} dBm × ${$('#nPort').value} · 天線 ${$('#antG').value} dBi`);
-  T('secModelSum', `反射${$('#order2').checked ? '（含二次）' : ''}＋穿透${$('#diffOn').checked ? '＋繞射' : ''}${terrOn() ? '＋地形' : ''} · 額外損耗 ${fmt(+$('#extraL').value || 0)} dB${!HAS_V2 && SITE.defaults && SITE.defaults.extraL != null && +$('#extraL').value === SITE.defaults.extraL ? '（借用值）' : ''}`);
+  { const p = extraParts(); T('secModelSum', `反射${$('#order2').checked ? '（含二次）' : ''}＋穿透${$('#diffOn').checked ? '＋繞射' : ''}${terrOn() ? '＋地形' : ''} · 額外損耗 ${fmt(p.dev + p.sc + p.adj)} dB（${(SCEN[$('#scen').value] || SCEN.hand).zh}${p.adj ? '，含校準修正 ' + fmt(p.adj) : ''}）`); }
 }
 document.querySelectorAll('.block.coll .ctog').forEach(b => b.addEventListener('click', () => {
   const sec = b.closest('.block'), closed = !sec.classList.contains('closed');
@@ -1861,13 +1870,13 @@ $('#pbody').addEventListener('change', () => syncSums());
   if (HAS_V2) {
     $('#dtNote').textContent = `V2 路測 ${V2.utc} · ${V2.rows.length} 點（${V2.rows.filter(r => r[3] != null).length} 點有 RSRP）。現場設定：天線離地 13 m、方位 30° / 150° / 270°（PCI 13 / 15 / 14）。`;
     $('#v2Title').textContent = `路測比對（${V2.utc}，${V2.rows.length} 點）`;
-    $('#calNote').textContent = '校準會調整「額外損耗」，讓預測 − 實測的平均誤差歸零。';
+    $('#calNote').textContent = '校準只調整「站點校準修正」，讓路測點的預測 − 實測平均誤差歸零；終端損耗與規劃情境不變。';
     st.ov = 'none';
   } else {
     $('#dtNote').textContent = '尚未匯入。事前評估不需要路測；後期優化有路測後，可以用來校準模型、在覆蓋圖上比對。';
     $('#dtTools').hidden = true;
     $('#calLos').disabled = true; $('#calAll').disabled = true;
-    $('#calNote').textContent = '沒有路測資料，無法校準。' + (SITE.defaults && SITE.defaults.extraL != null ? `額外損耗目前 ${SITE.defaults.extraL} dB 是借用 Anchorage 車內實測的校準值。` : '');
+    $('#calNote').textContent = '沒有路測資料，無法校準；校準修正維持 0 dB。';
     document.querySelectorAll('#ovSeg button').forEach(b => { b.disabled = true; });
     $('#ovNote').textContent = '沒有路測資料。到「站點 › 資料」可以看路測狀態。';
     const mb = $('#ptsSeg [data-pm="meas"]'); mb.disabled = true; mb.textContent = '路測點（未匯入）';
@@ -1878,33 +1887,54 @@ $('#pbody').addEventListener('change', () => syncSums());
   if (window.matchMedia('(max-width:699px)').matches) setCollapsed(true);
 })();
 
-/* ===== extra loss / calibration status ===== */
-function saveExtra() { try { localStorage.setItem(SK('Extra'), JSON.stringify({ v: +$('#extraL').value || 0, cal: st.cal || null })); } catch (e) {} }
-(function loadExtra() { try { const j = JSON.parse(localStorage.getItem(SK('Extra')) || 'null'); if (j && Number.isFinite(j.v)) { $('#extraL').value = j.v; st.cal = j.cal || null; } } catch (e) {} })();
+/* ===== extra loss = device loss + scenario + site calibration correction ===== */
+// Same defaults at every site: device loss from the lab n79 test, outdoor handheld, no correction until a drive test exists.
+const DEV_DEFAULT = 14;
+const SCEN = { hand: { db: 0, zh: '戶外手持' }, car: { db: 8, zh: '車內' } };
+const scenDb = k => (SCEN[k] || SCEN.hand).db;
+const measScen = () => SITE.v2scen || 'car';
+function measDelta() { return scenDb(measScen()) - scenDb($('#scen').value); }   // drive-test points: extra loss of the drive-test scenario
+const extraParts = () => ({ dev: +$('#devL').value || 0, sc: scenDb($('#scen').value), adj: +$('#calAdj').value || 0 });
+function saveExtra() {
+  try { localStorage.setItem('devLoss', String(+$('#devL').value || 0)); localStorage.setItem('planScen', $('#scen').value); } catch (e) {}
+  try { localStorage.setItem(SK('Cal'), JSON.stringify({ adj: +$('#calAdj').value || 0, cal: st.cal || null })); } catch (e) {}
+}
+(function loadExtra() {
+  try { const d = localStorage.getItem('devLoss'); if (d != null && d !== '' && Number.isFinite(+d)) $('#devL').value = +d; } catch (e) {}
+  try { const sc = localStorage.getItem('planScen'); if (SCEN[sc]) $('#scen').value = sc; } catch (e) {}
+  try { const j = JSON.parse(localStorage.getItem(SK('Cal')) || 'null'); if (j && Number.isFinite(j.adj)) { $('#calAdj').value = j.adj; st.cal = j.cal || null; } } catch (e) {}
+  try { localStorage.removeItem(SK('Extra')); } catch (e) {}   // old single-number format
+  const p = extraParts(); $('#extraL').value = p.dev + p.sc + p.adj;
+})();
+function syncExtraNote() {
+  const p = extraParts(), tot = p.dev + p.sc + p.adj, sn = (SCEN[$('#scen').value] || SCEN.hand).zh, sg = v => (v >= 0 ? '+ ' : '− ') + fmt(Math.abs(v));
+  let t = `合計額外損耗 = 終端 ${fmt(p.dev)} ${sg(p.sc)}（${sn}）${sg(p.adj)}（校準修正）= ${fmt(tot)} dB。終端損耗依實驗室 n79 量測：3 m 理論 RSRP 約 −50 dBm，實測 −62 到 −66 dBm。`;
+  if (HAS_V2) { const m = p.dev + scenDb(measScen()) + p.adj; t += `路測點以量測時的情境（${SCEN[measScen()].zh}）計算：${fmt(m)} dB。`; }
+  $('#extraNote').textContent = t;
+}
+function applyExtra() {
+  const p = extraParts(); $('#extraL').value = p.dev + p.sc + p.adj;
+  saveExtra(); syncExtraNote(); syncLbNote(); if (st.osm) refresh(false); syncCalHint(); syncSums();
+}
 function syncCalHint() {
   const el = $('#calHint'); if (!el) return;
-  const x = +$('#extraL').value || 0;
-  if (HAS_V2) {
-    if (st.cal) {
-      el.className = 'calhint';
-      el.innerHTML = `已用路測校準：額外損耗 ${fmt(x)} dB（${st.cal.which === 'los' ? 'LOS ' : '全部 '}${st.cal.n} 點，平均誤差歸零）。<div class="tools"><button type="button" data-cal="${st.cal.which === 'los' ? 'all' : 'los'}">改用${st.cal.which === 'los' ? '全部路測點' : ' LOS 點'}校準</button><button type="button" data-cal="reset">還原預設</button></div>`;
-    } else {
-      el.className = 'calhint warn';
-      el.innerHTML = `模型尚未用路測校準（額外損耗 ${fmt(x)} dB），熱力圖會偏樂觀。<div class="tools"><button type="button" data-cal="all">用全部路測點校準</button><button type="button" data-cal="los">只用 LOS 點校準</button></div>`;
-    }
+  const p = extraParts(), tot = p.dev + p.sc + p.adj, sn = (SCEN[$('#scen').value] || SCEN.hand).zh;
+  const head = `額外損耗 ${fmt(tot)} dB（終端 ${fmt(p.dev)}、${sn} ${fmt(p.sc)}、校準修正 ${fmt(p.adj)}）。`;
+  if (HAS_V2 && st.cal) {
+    el.className = 'calhint';
+    el.innerHTML = head + `已用${st.cal.which === 'los' ? ' LOS ' : '全部'}路測點（${st.cal.n} 點）校準。<div class="tools"><button type="button" data-cal="${st.cal.which === 'los' ? 'all' : 'los'}">改用${st.cal.which === 'los' ? '全部路測點' : ' LOS 點'}校準</button><button type="button" data-cal="reset">清除校準修正</button></div>`;
+  } else if (HAS_V2) {
+    el.className = 'calhint warn';
+    el.innerHTML = head + '還沒用這個站點的路測校準。<div class="tools"><button type="button" data-cal="all">用全部路測點校準</button><button type="button" data-cal="los">只用 LOS 點校準</button></div>';
   } else {
-    el.className = 'calhint' + (x === 0 ? ' warn' : '');
-    el.innerHTML = x === 0 ? '額外損耗為 0 dB，沒有扣除終端與車體損耗，熱力圖會偏樂觀。到「站點 › 模型與校準」設定。' :
-      `額外損耗 ${fmt(x)} dB${SITE.defaults && SITE.defaults.extraL === x ? '，借用 Anchorage 車內實測的校準值' : ''}。沒有路測可以校準；到「站點 › 模型與校準」修改。` + (x !== defExtra() ? '<div class="tools"><button type="button" data-cal="reset">還原預設</button></div>' : '');
+    el.className = 'calhint';
+    el.innerHTML = head + '這個站點沒有路測，校準修正為 0；預設值和其他站點相同。' + (p.adj ? '<div class="tools"><button type="button" data-cal="reset">清除校準修正</button></div>' : '');
   }
 }
-const defExtra = () => (SITE.defaults && SITE.defaults.extraL != null ? SITE.defaults.extraL : 0);
 function resetExtra() {
-  const before = +$('#extraL').value || 0, d = defExtra();
-  $('#extraL').value = d; st.cal = null;
-  try { localStorage.removeItem(SK('Extra')); } catch (e) {}
-  syncLbNote(); if (st.osm) refresh(false); syncCalHint(); syncSums();
-  toast(`額外損耗 ${fmt(before)} → ${fmt(d)} dB（預設值）`);
+  const before = +$('#calAdj').value || 0;
+  $('#calAdj').value = 0; st.cal = null; applyExtra();
+  toast(`站點校準修正 ${fmt(before)} → 0 dB`);
 }
 $('#calReset').onclick = resetExtra;
 $('#calHint').addEventListener('click', e => { const b = e.target.closest('[data-cal]'); if (b) { if (b.dataset.cal === 'reset') resetExtra(); else calibrate(b.dataset.cal); } });
@@ -1957,8 +1987,7 @@ async function moveBS(lat, lon) {
   $('#band').innerHTML = Object.entries(BANDS).map(([id, b]) => `<option value="${id}">${b.lbl}</option>`).join('');
   $('#band').value = SITE.band || 'n48';
   const d = SITE.defaults || {};
-  let savedExtra = false; try { savedExtra = !!localStorage.getItem(SK('Extra')); } catch (e) {}
-  for (const [k, v] of Object.entries(d)) { if (k === 'extraL' && savedExtra) continue; const el = document.getElementById(k); if (el) el.value = v; }
+  for (const [k, v] of Object.entries(d)) { const el = document.getElementById(k); if (el) el.value = v; }
   if (d.antModel) applyAntModel(true);
   [...$('#bsrc').options].forEach(o => { if (!SITE.bsrc.includes(o.value)) o.remove(); });
   if (SITE.bsrc.length === 1 && SITE.bsrc[0] === 'osm') $('#bsrc').options[0].textContent = '即時查詢 OpenStreetMap（之後可下載內附）';
@@ -1970,7 +1999,7 @@ async function moveBS(lat, lon) {
     $('#showM').closest('label').hidden = true;
     const zo = $('#zPts').querySelector('option[value="sites"]'); if (zo) zo.textContent = '半徑內的 UE';
   }
-  syncBSFields(); syncBand(false); syncLbNote(); syncSums(); syncCalHint();
+  syncBSFields(); syncBand(false); syncLbNote(); syncExtraNote(); syncSums(); syncCalHint();
   $('#band').addEventListener('change', () => { $('#fMHz').value = curBand().f; syncBand(true); syncLbNote(); st.cache = {}; refresh(false); });
   ['#bw', '#scs', '#fMHz'].forEach(sel => $(sel).addEventListener('change', () => syncBand(false)));
   $('#bsApply').onclick = () => moveBS(+$('#bsLat').value, +$('#bsLon').value);
@@ -2316,7 +2345,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 15:45';
+const APP_VERSION = '2026-11-07 16:20';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -2404,7 +2433,7 @@ function renderKpis() {
       kpi('平均 SINR', fmt(avg(L.map(l => l.hasI ? l.sinr : l.snr))), 'dB') + kpi('有效 UE', `${L.length}/${SITE.ues.length}`, '');
     return;
   }
-  const r = traceUE(st.sel), lk = link(r), s = stats(r.kept), a = antCfg();
+  const r = traceUE(st.sel), lk = link(r), s = stats(r.kept, st.sel), a = antCfg();
   if (!lk) { el.innerHTML = kpi('RSRP', '—', '無路徑') + kpi('SINR', '—', '') + kpi('服務扇區', '—', '') + kpi('RMS 時延擴展', '—', ''); return; }
   const lv = rsrpLv(lk.rsrp);
   el.innerHTML = kpi('RSRP · ' + tgtName(st.sel), fmt(lk.rsrp), lv[1] + ' · dBm', lv[2]) +
@@ -2476,9 +2505,17 @@ Object.assign(EN, {"只用 LOS 點校準": "Calibrate with LOS points only", "�
 Object.assign(EN, {"還原預設額外損耗": "Reset extra loss to default", "還原預設": "Reset to default"});
 Object.assign(EN, {"地形用 AWS Terrain Tiles（約 30 m）：建築、UE 放在地面上，穿過地面的路徑捨棄，山脊和屋頂一起取最強的一處算繞射。關閉地形時地面為水平面。h₀ 是 BS 地面在顯示圖層中的高度；用 Google 寫實 3D 時取 UE 位置模型表面高度（扣掉地形）的中位數，只用來對齊疊加圖層。": "Terrain comes from AWS Terrain Tiles (about 30 m): buildings and UEs sit on the ground, paths through the ground are discarded, and ridges compete with rooftops as the single strongest diffraction edge. With terrain off the ground is flat. h₀ is the height of the BS ground in the display layer; with Google photorealistic 3D it is the median model surface height at the UE positions (terrain removed), used only to align the overlay.", "點的種類": "Point type", "採用": "using"});
 Object.assign(EN, {"站點覆蓋評估": "Site coverage evaluation"});
+Object.assign(EN, {"終端損耗 (dB)": "Device loss (dB)", "規劃情境": "Planning scenario", "戶外手持（+0 dB）": "Outdoor handheld (+0 dB)", "車內（+8 dB）": "In-car (+8 dB)", "站點校準修正 (dB)": "Site calibration correction (dB)", "清除校準修正": "Clear calibration correction", "還沒用這個站點的路測校準。": "Not calibrated with this site's drive test yet.", "這個站點沒有路測，校準修正為 0；預設值和其他站點相同。": "This site has no drive test, so the correction is 0; defaults are the same as at every other site.", "沒有路測資料，無法校準；校準修正維持 0 dB。": "No drive-test data, so calibration is unavailable; the correction stays at 0 dB.", "校準只調整「站點校準修正」，讓路測點的預測 − 實測平均誤差歸零；終端損耗與規劃情境不變。": "Calibration changes only the site calibration correction so the mean predicted − measured error at drive-test points becomes zero; device loss and planning scenario stay as set.", "戶外手持": "outdoor handheld", "車內": "in-car"});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^合計額外損耗 = 終端 ([−\d.]+) ([+−]) ([\d.]+)（(.+?)）\s*([+−]) ([\d.]+)（校準修正）= ([−\d.]+) dB。終端損耗依實驗室 n79 量測：3 m 理論 RSRP 約 −50 dBm，實測 −62 到 −66 dBm。/, (m, a, s1, b, sn, s2, c, t) => `Total extra loss = device ${a} ${s1} ${b} (${sn === '車內' ? 'in-car' : 'outdoor handheld'}) ${s2} ${c} (calibration correction) = ${t} dB. Device loss is from the lab n79 test: at 3 m the theoretical RSRP is about −50 dBm, measured −62 to −66 dBm. `],
+  [/路測點以量測時的情境（(.+?)）計算：([−\d.]+) dB。/, (m, sn, v) => `Drive-test points use the scenario they were measured in (${sn === '車內' ? 'in-car' : 'outdoor handheld'}): ${v} dB.`],
+  [/^額外損耗 ([−\d.]+) dB（終端 ([−\d.]+)、(戶外手持|車內) ([−\d.]+)、校準修正 ([−\d.]+)）。/, (m, t, d, sn, sc, a) => `Extra loss ${t} dB (device ${d}, ${sn === '車內' ? 'in-car' : 'outdoor handheld'} ${sc}, correction ${a}). `],
+  [/已用(?: LOS |全部)路測點（(\d+) 點）校準。/, m => m.includes('LOS') ? `Calibrated with LOS drive-test points (${m.match(/\d+/)[0]}). ` : `Calibrated with all drive-test points (${m.match(/\d+/)[0]}). `],
+  [/^站點校準修正 ([−\d.]+) → ([−\d.]+) dB/, 'Site calibration correction $1 → $2 dB'],
+  [/（依 (\d+) 個( LOS )?路測點，平均誤差歸零）/, (m, n, l) => ` (from ${n} ${l ? 'LOS ' : ''}drive-test points; mean error now zero)`],
+  [/額外損耗 ([−\d.]+) dB（(戶外手持|車內)(，含校準修正 ([−\d.]+))?）/, (m, t, sn, x, a) => `extra loss ${t} dB (${sn === '車內' ? 'in-car' : 'outdoor handheld'}${a ? ', incl. correction ' + a : ''})`],
   [/^額外損耗 ([\d.]+) → ([\d.]+) dB（預設值）$/, 'Extra loss $1 → $2 dB (default)'],
   [/^已用路測校準：額外損耗 ([\d.]+) dB（(LOS |全部 )(\d+) 點，平均誤差歸零）。/, (m, a, w, n) => `Calibrated with drive test: extra loss ${a} dB (${w === 'LOS ' ? 'LOS' : 'all'} ${n} points, mean error zeroed). `],
   [/^模型尚未用路測校準（額外損耗 ([\d.]+) dB），熱力圖會偏樂觀。/, 'Not calibrated with the drive test yet (extra loss $1 dB), so the heatmap is optimistic. '],
