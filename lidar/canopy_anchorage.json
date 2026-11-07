@@ -1,0 +1,1 @@
+{"source": "NOAA 2015 Anchorage lidar (ID 8406): first-return surface minus ground, buildings removed", "ref": {"lat": 61.1729384, "lon": -149.8841974}, "x0": -1514.0, "z0": -1316.0, "step": 2.0, "nx": 1555, "nz": 1320, "scale": 0.2, "file": "canopy_anchorage.bin.gz", "stats": {"tree_fraction": 0.145, "median_h": 8.6, "p90_h": 17.9}}
