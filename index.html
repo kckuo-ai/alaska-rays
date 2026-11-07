@@ -22,6 +22,11 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.
 html,body{overflow-x:hidden}
 #mstatus{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:10;max-width:calc(100% - 20px);background:rgba(16,21,27,.88);border:1px solid var(--line);border-radius:4px;padding:5px 10px;font-size:12px;color:var(--fg);white-space:pre-line;pointer-events:none}
 #mstatus.err{color:var(--bad);border-color:var(--bad)}
+#updBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:60;display:flex;gap:10px;align-items:center;padding:6px 6px 6px 14px;background:#ffb347;color:#1a1205;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-size:14px;max-width:92vw}
+#updBar span,#updBar button{white-space:nowrap}
+#updBar button{border:0;border-radius:8px;min-height:40px;padding:0 14px;background:#1a1205;color:#ffb347;font:inherit;font-weight:700;cursor:pointer}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.linkbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;max-width:min(92vw,520px);
   background:#f3f5f7;color:#10151b;border-radius:6px;padding:8px 12px;font-size:13px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .mlegend{position:absolute;right:10px;top:62px;z-index:12;width:min(300px,calc(100% - 20px));max-height:calc(100% - 120px);overflow:auto;background:rgba(16,21,27,.85);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:11px/1.3 var(--mono);color:var(--muted)}
@@ -247,6 +252,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <div id="mlegendBody"></div>
     </div>
   </div>
+  <div id="updBar" role="status" hidden><span id="updMsg"></span><button type="button" id="updGo">重新載入</button></div>
   <aside class="panel" id="panel">
     <div class="handle" id="sheetHandle" role="button" tabindex="0" aria-label="展開或收合面板"><span></span></div>
     <div class="phead">
@@ -543,7 +549,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       <div id="optOut" style="margin-top:10px"></div>
     </section>
 
-    <p class="sub appverline" data-tab="set"><span class="appver"></span> · <a href="https://github.com/kckuo-ai/alaska-rays" target="_blank" rel="noopener">GitHub</a></p>
+    <p class="sub appverline" data-tab="set"><span class="appver"></span> · <button type="button" class="linkbtn" id="chkUpd">檢查更新</button> · <a href="https://github.com/kckuo-ai/alaska-rays" target="_blank" rel="noopener">GitHub</a></p>
       </div>
   </aside>
 </div>
@@ -2265,8 +2271,27 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-07 13:40';
+const APP_VERSION = '2026-11-07 14:00';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
+// Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
+// for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
+function hardReload() { const u = new URL(location.href); u.searchParams.set('v', Date.now().toString(36)); location.replace(u.toString()); }
+let updLast = 0;
+async function checkUpdate(manual) {
+  updLast = Date.now();
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    const j = await r.json();
+    if (j.version && j.version > APP_VERSION) {
+      $('#updMsg').textContent = `有新版本 ${j.version.slice(5)}`; $('#updBar').hidden = false;
+    } else if (manual) toast(`已是最新版本（${APP_VERSION}）。`);
+  } catch (e) { if (manual) toast('無法檢查更新，請確認網路連線。'); }
+}
+$('#updGo').addEventListener('click', hardReload);
+$('#chkUpd').addEventListener('click', () => checkUpdate(true));
+setTimeout(() => checkUpdate(false), 2500);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - updLast > 60000) checkUpdate(false); });
 const isPhone = () => window.matchMedia('(max-width:699px)').matches;
 let curTab = 'set';
 let ptsMode = 'ue';
@@ -2398,9 +2423,12 @@ const EN = {"下傾角 = 電子下傾 + 機械下傾。RSRP 以單一埠計算�
 Object.assign(EN, {"高雄站點多徑射線（事前評估）": "Kaohsiung Site Multipath Rays (pre-deployment)", "高雄 射線": "Kaohsiung rays", "（事前評估）": " (pre-deployment)", "（含路測）": " (with drive test)", "高雄": "Kaohsiung", "評估站點": "Site", "基站緯度": "BS latitude", "基站經度": "BS longitude", "在地圖上點選基站": "Pick BS on map", "套用座標": "Apply coordinates", "頻段（TDD）": "Band (TDD)", "國土測繪中心正射影像＋OSM 建築體（免金鑰，臺灣）": "NLSC orthophoto + OSM buildings (no key, Taiwan)", "國土測繪中心通用版電子地圖＋OSM 建築體（免金鑰，臺灣）": "NLSC e-map + OSM buildings (no key, Taiwan)", "即時查詢 OpenStreetMap（之後可下載內附）": "Live OpenStreetMap query (download to bundle later)", "這個站點的座標只是區域位置，不是實際基站位置：請在地圖上點選或輸入候選基站位置。": "This site's coordinate marks the area only, not the actual BS. Pick or enter a candidate BS position.", "基站位置已更新，按「載入地圖並計算」。": "BS position updated. Press \"Load map and compute\".", "先按「載入地圖並計算」，再在地圖上點選基站。": "Press \"Load map and compute\" first, then pick the BS on the map.", "點地圖選基站位置（點在建築上，天線會放在該建築屋頂）。": "Tap the map to place the BS (tap a building to put the antenna on its roof).", "基站座標格式不對。": "The BS coordinates are not valid.", "國土測繪中心圖磚載入失敗（可能是網路或伺服器限制），可改用「衛星影像」背景。": "NLSC tiles failed to load (network or server restriction). Try the satellite background instead.", "RSRP／SINR 以下行功率計算，TDD 上下行時槽比例不影響這兩個值。": "RSRP and SINR use downlink power, so the TDD UL/DL slot ratio does not change them.", "中心頻率不在此頻段內。": "The center frequency is outside this band.", "半徑內的 UE": "UEs within the radius", "這個站點沒有內附建築檔": "This site has no bundled building file", "這個站點沒有內附建築輪廓": "This site has no bundled building outlines"});
 Object.assign(EN, {"地形高程": "Terrain", "地形關閉：地面視為水平面。": "Terrain off: the ground is treated as flat.", "載入地圖時會一起抓地形高程（AWS Terrain Tiles，資料解析度約 30 m）。": "Terrain heights load with the map (AWS Terrain Tiles, about 30 m source resolution).", "載入地形高程…": "Loading terrain…", "高程圖磚逾時": "terrain tile timed out", "高程圖磚讀取失敗": "terrain tile failed to load", "這裡沒有高程資料": "no elevation data here", "範圍太大": "area too large"});
 Object.assign(EN, {"站點與基站": "Site and BS", "地圖與建築": "Map and buildings", "設備與頻段": "Equipment and band", "模型與校準": "Model and calibration", "站點": "Site", "點位": "Points", "覆蓋": "Coverage", "資料": "Data", "地形": "Terrain", "路測": "Drive test", "檔案": "Files", "模型假設": "Model assumptions", "規劃 UE": "Planned UEs", "路測點": "Drive-test points", "（未匯入）": " (not imported)", "疊上路測": "Drive-test overlay", "不疊": "Off", "實測值": "Measured", "預測−實測": "Predicted − measured", "路測比對": "Drive-test comparison", "誤差最大的點": "Largest errors", "到點位看全部路測點": "See all drive-test points in Points", "用 LOS 路測點校準額外損耗": "Calibrate extra loss with LOS drive-test points", "用全部路測點校準": "Calibrate with all drive-test points", "校準會調整「額外損耗」，讓預測 − 實測的平均誤差歸零。": "Calibration adjusts \"Extra loss\" so the mean predicted − measured error becomes zero.", "沒有路測資料，無法校準。": "No drive-test data, so calibration is unavailable. ", "尚未匯入。事前評估不需要路測；後期優化有路測後，可以用來校準模型、在覆蓋圖上比對。": "Not imported. Pre-deployment evaluation needs no drive test; once one exists for optimization, use it to calibrate the model and compare on the coverage map.", "沒有路測資料。到「站點 › 資料」可以看路測狀態。": "No drive-test data. See its status under Site › Data.", "路測點用和熱力圖相同的 RSRP 分級顏色：點的顏色和底下熱力圖相近，代表預測準。": "Drive-test points use the same RSRP colors as the heatmap: where a point matches the color beneath it, the prediction is accurate.", "路測點顏色為預測 − 實測：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內，灰色＝實測無服務。": "Point color shows predicted − measured: orange = model too high, blue = too low, white = within ±3 dB, gray = no service measured.", "點表格或地圖上的路測點，可以看該點的射線。地圖上的顏色：橘色＝模型高估，藍色＝低估，白色＝誤差在 ±3 dB 內。": "Tap a row or a drive-test point on the map to see its rays. Map colors: orange = model too high, blue = too low, white = within ±3 dB.", "≥ −110 dBm 面積": "≥ −110 dBm area", "覆蓋率": "coverage", "邊緣 RSRP": "Edge RSRP", "最差 10%": "worst 10%", "SINR 中位數": "SINR median", "SNR 中位數": "SNR median", "RSRP 中位數": "RSRP median", "平均誤差": "Mean error", "標準差": "Std dev", "PCI 吻合": "PCI match", "LOS 誤差": "LOS error", "預測−實測 · ": "predicted − measured · ", "地形關閉": "terrain off", "地形載入失敗": "terrain failed to load", "地形：載入後顯示": "terrain: shown after loading", "建築：載入後顯示": "buildings: shown after loading", "路測未匯入": "no drive test", "（借用值）": " (borrowed value)", "反射（含二次）": "reflection (incl. 2nd order)", "＋穿透": " + penetration", "＋繞射": " + diffraction", "＋地形": " + terrain", "樓頂": "roof", "中位數": "median", "邊緣": "edge"});
+Object.assign(EN, {"檢查更新": "Check for updates", "重新載入": "Reload", "無法檢查更新，請確認網路連線。": "Could not check for updates. Check your connection."});
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^有新版本 (.+)$/, 'New version $1'],
+  [/^已是最新版本（(.+)）。$/, 'You have the latest version ($1).'],
   [/建築 (\d+) 棟（(\d+) 棟無高度）/, 'Buildings $1 ($2 without height)'],
   [/地形高差 ([\d.]+) m/, 'terrain relief $1 m'],
   [/路測 (\d+) 點(?!（)/, 'drive test $1 points'],

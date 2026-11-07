@@ -316,6 +316,8 @@ SINR     = S / (另兩個扇區同頻干擾 + 雜訊)
 2. 複製為 repo 的 `index.html`，同時更新 `APP_VERSION`。
 3. `git commit`、`git push origin main`。
 4. GitHub Pages 約 5–7 分鐘更新，用 `?v=` 參數確認新版。
+5. 同時更新 `version.json`（內容為 `APP_VERSION`）。頁面開啟 2.5 秒後、以及從背景切回來時（間隔超過 1 分鐘）會用 `cache: 'no-store'` 讀它，有新版就在頂端顯示「有新版本 · 重新載入」，按下後加上 `?v=` 參數重新載入。
+   - 原因：GitHub Pages 讓 HTML 快取約 10 分鐘，加到主畫面的 Web App 沒有網址列和重新整理鈕，無法自己繞過快取。設定分頁底部也有「檢查更新」。
 
 **測試方式：**
 
