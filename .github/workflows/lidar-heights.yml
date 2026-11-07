@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install
-        run: pip install "laspy[lazrs]==2.7.0" numpy shapely pyproj
+        run: pip install "laspy[lazrs]==2.7.0" numpy shapely pyproj scipy
       - name: Compute heights from NOAA 2015 Anchorage lidar
         run: |
           set -o pipefail

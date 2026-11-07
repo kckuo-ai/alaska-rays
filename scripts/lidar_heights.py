@@ -8,20 +8,27 @@ For every OSM footprint:
 Footprints whose height comes out below 2 m are listed as "flat": the lidar saw only ground there,
 so the building is probably newer than the 2015 survey (or is a carport/slab) and keeps its default height.
 
+Also writes a canopy height grid (lidar/canopy_anchorage.json + .bin.gz): first-return surface minus
+gap-filled ground, with building footprints (+1.5 m) removed, heights < 2.5 m and blobs < 6 m2 dropped,
+resampled (2x2 max) onto a 2 m east/north grid around REF, the same local frame the web page uses.
+
 Runs in GitHub Actions (network access to NOAA's public S3 bucket). LIDAR_DIR=... reuses local .laz files.
 """
-import json, os, sys, time, urllib.request
+import gzip, json, os, sys, time, urllib.request
 import numpy as np
 import laspy
 import shapely
 from shapely.geometry import Polygon
 from pyproj import CRS, Transformer
+from scipy import ndimage
 
 BASE = 'https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com/laz/geoid12b/8406/'
 TILES = ['20150510_AK_Anchorage_2015_%s.copc.laz' % t for t in
          ['63436785', '63446784', '63446785', '63446786', '63456784', '63456785', '63456786']]
 AOI = (666100.0, 6784800.0, 669100.0, 6787300.0)     # UTM 5N metres: drive-test extent + margin
 CELL = 1.0
+REF = (61.1729384, -149.8841974)                      # site BS (lat, lon): origin of the canopy grid
+CAN_STEP = 2.0
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(REPO, 'lidar')
 NOISE = {7, 18}
@@ -99,6 +106,7 @@ def main():
     src = json.load(open(os.path.join(REPO, 'buildings_osm.json'), encoding='utf-8'))
     tf = Transformer.from_crs('EPSG:4326', crs, always_xy=True)
     heights, flat, skipped = {}, [], 0
+    bmask = np.zeros((ny, nx), dtype=bool)
     for b in src['buildings']:
         xy = [tf.transform(lon, lat) for lon, lat in b['ll']]
         if len(xy) < 4:
@@ -111,6 +119,14 @@ def main():
         bx0, by0, bx1, by1 = poly.bounds
         if bx1 < x0 + 12 or bx0 > x1 - 12 or by1 < y0 + 12 or by0 > y1 - 12:
             continue
+        grow = poly.buffer(1.5)
+        gx0, gy0, gx1, gy1 = grow.bounds
+        i0, i1 = max(0, int((gx0 - x0) / CELL)), min(nx - 1, int((gx1 - x0) / CELL))
+        j0, j1 = max(0, int((gy0 - y0) / CELL)), min(ny - 1, int((gy1 - y0) / CELL))
+        if i1 >= i0 and j1 >= j0:
+            II, JJ = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1))
+            ins = shapely.contains_xy(grow, x0 + (II + .5) * CELL, y0 + (JJ + .5) * CELL)
+            bmask[JJ[ins], II[ins]] = True
         inner = poly.buffer(-1.0)
         if inner.is_empty or inner.area < 4:
             inner = poly.buffer(-0.3) if not poly.buffer(-0.3).is_empty else poly
@@ -154,6 +170,52 @@ def main():
     with open(os.path.join(OUT_DIR, 'heights_anchorage.json'), 'w', encoding='utf-8') as f:
         json.dump(out, f, separators=(',', ':'))
     log('stats', json.dumps(stats))
+    canopy(dsm, gnd, bmask, tf, crs)
+
+
+def canopy(dsm, gnd, bmask, tf, crs):
+    x0, y0, x1, y1 = AOI
+    ny, nx = dsm.shape
+    miss = ~np.isfinite(gnd)
+    _, (ri, rj) = ndimage.distance_transform_edt(miss, return_indices=True)
+    gf = gnd[ri, rj]                                              # ground filled from the nearest measured cell
+    chm = dsm - gf
+    chm[~np.isfinite(chm) | bmask] = 0
+    chm[chm < 2.5] = 0
+    chm = np.clip(chm, 0, 45)
+    lab, n = ndimage.label(chm > 0, structure=np.ones((3, 3)))
+    if n:
+        sizes = ndimage.sum(np.ones_like(chm), lab, index=np.arange(1, n + 1))
+        small = np.zeros(n + 1, dtype=bool); small[1:] = sizes < 6
+        chm[small[lab]] = 0
+    chm = ndimage.maximum_filter(chm, size=2)
+    # 2 m east/north grid around REF, same approximation as the page (metres per degree at REF latitude)
+    lat0, lon0 = REF
+    mlat, mlon = 111320.0, 111320.0 * np.cos(np.radians(lat0))
+    back = Transformer.from_crs(crs, 'EPSG:4326', always_xy=True)
+    cl = np.array([back.transform(x, y) for x, y in [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]])
+    ex0, ex1 = (cl[:, 0].min() - lon0) * mlon, (cl[:, 0].max() - lon0) * mlon
+    nz0, nz1 = (cl[:, 1].min() - lat0) * mlat, (cl[:, 1].max() - lat0) * mlat
+    gx0, gz0 = np.floor(ex0 / CAN_STEP) * CAN_STEP, np.floor(nz0 / CAN_STEP) * CAN_STEP
+    gnx, gnz = int((ex1 - gx0) / CAN_STEP) + 1, int((nz1 - gz0) / CAN_STEP) + 1
+    E, N = np.meshgrid(gx0 + np.arange(gnx) * CAN_STEP, gz0 + np.arange(gnz) * CAN_STEP)
+    ux, uy = tf.transform(lon0 + E / mlon, lat0 + N / mlat)
+    ii, jj = ((np.asarray(ux) - x0) / CELL).astype(int), ((np.asarray(uy) - y0) / CELL).astype(int)
+    ok = (ii >= 0) & (ii < nx) & (jj >= 0) & (jj < ny)
+    out = np.zeros(E.shape, dtype=np.float32)
+    out[ok] = chm[jj[ok], ii[ok]]
+    q = np.clip(np.round(out / 0.2), 0, 255).astype(np.uint8)  # 0.2 m units, row = north index
+    with gzip.open(os.path.join(OUT_DIR, 'canopy_anchorage.bin.gz'), 'wb', compresslevel=9) as f:
+        f.write(q.tobytes())
+    tree = out > 0
+    meta = {'source': 'NOAA 2015 Anchorage lidar (ID 8406): first-return surface minus ground, buildings removed',
+            'ref': {'lat': lat0, 'lon': lon0}, 'x0': float(gx0), 'z0': float(gz0), 'step': CAN_STEP, 'nx': gnx, 'nz': gnz,
+            'scale': 0.2, 'file': 'canopy_anchorage.bin.gz',
+            'stats': {'tree_fraction': round(float(tree.mean()), 3), 'median_h': round(float(np.median(out[tree])), 1) if tree.any() else 0,
+                      'p90_h': round(float(np.percentile(out[tree], 90)), 1) if tree.any() else 0}}
+    with open(os.path.join(OUT_DIR, 'canopy_anchorage.json'), 'w', encoding='utf-8') as f:
+        json.dump(meta, f)
+    log('canopy', json.dumps(meta['stats']), f'grid {gnx}x{gnz}')
 
 
 if __name__ == '__main__':
