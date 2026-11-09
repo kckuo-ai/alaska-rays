@@ -1763,7 +1763,8 @@ $('#ruKml').addEventListener('click', () => {
     const k = Math.max(0, RU_CELLS.indexOf(w.cell)), col = w.indoor ? 'ffb1a59a' : kc(SEC_COL[k % SEC_COL.length]);
     const ext = [['Cell', 'Cell-' + w.cell], ['啟用', w.indoor ? '室內' : w.on ? '是' : '否'], ['方位角', n1(w.az, 0)], ['電子下傾', n1(w.tilt, 0)], ['機械下傾', n1(w.mech, 0)], ['地面海拔_m', n1(w.groundASL)], ['天線離地_m', n1(w.antAGL)], ['天線海拔_m', n1(w.antASL)], ['距KML原位_m', n1(w.moved)], ['說明', w.loc]]
       .filter(([, v]) => v !== '').map(([k2, v]) => `<Data name="${esc(k2)}"><value>${esc(v)}</value></Data>`).join('');
-    const alt = w.antASL != null ? `<altitudeMode>absolute</altitudeMode><coordinates>${w.lon},${w.lat},${w.antASL.toFixed(1)}</coordinates>` : w.antAGL != null ? `<altitudeMode>relativeToGround</altitudeMode><coordinates>${w.lon},${w.lat},${w.antAGL.toFixed(1)}</coordinates>` : `<coordinates>${w.lon},${w.lat},0</coordinates>`;
+    // height above ground, not absolute: Google Earth's terrain differs from the DEM used here, so an absolute height could sit under or over its ground (ASL is in the data fields)
+    const alt = w.antAGL != null ? `<altitudeMode>relativeToGround</altitudeMode><coordinates>${w.lon},${w.lat},${w.antAGL.toFixed(1)}</coordinates>` : `<coordinates>${w.lon},${w.lat},0</coordinates>`;
     let s2 = `<Placemark><name>${esc(w.id)}</name><Style><IconStyle><color>${col}</color><scale>0.9</scale><Icon><href>http://maps.google.com/mapfiles/kml/shapes/triangle.png</href></Icon></IconStyle><LabelStyle><scale>0.8</scale></LabelStyle></Style><ExtendedData>${ext}</ExtendedData><Point>${alt}</Point></Placemark>`;
     if (!w.indoor && w.az != null) {
       const b = w.az * Math.PI / 180, lat2 = w.lat + L * Math.cos(b) / mLat, lon2 = w.lon + L * Math.sin(b) / (mLat * Math.cos(w.lat * Math.PI / 180));
@@ -3025,7 +3026,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 16:41';
+const APP_VERSION = '2026-11-09 16:42';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
