@@ -306,6 +306,7 @@ tr.p:hover,tr.p.on{background:rgba(255,179,71,.12)}
       </div>
       <div class="tools" style="margin-top:10px"><button type="button" id="siteReset">清除本機設定，回到預設</button></div>
       <p class="sub" id="siteResetNote" style="margin-top:4px">清除這個站點存在這個瀏覽器的調整：RU 位置／方位角／下傾／開關、UE 位置、基站位置、建築高度與材料、描出的建築、校準與額外損耗。OSM 建築快取保留。清除後重新載入頁面。</p>
+    </section>
 
     <section class="block" data-tab="set">
       <h2>地圖與建築</h2>
@@ -3176,7 +3177,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 18:40';
+const APP_VERSION = '2026-11-09 18:45';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
