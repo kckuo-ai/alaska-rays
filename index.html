@@ -936,14 +936,6 @@ const BANDS = {
   n79: { lo: 4400, hi: 5000, f: 4850, bws: [40, 50, 80, 90, 100], lbl: 'n79（4400–5000 MHz）' }
 };
 const curBand = () => BANDS[$('#band').value] || BANDS.n48;
-// ss-PBCH-BlockPower is the SSS EPRE per subcarrier at the antenna connector; with SSB and PDSCH at the same EPRE,
-// per-port output power = EPRE + 10·log10(number of subcarriers in the carrier)
-$('#ssApply').addEventListener('click', () => {
-  if ($('#ssPwr').value === '') { status('請先填 SIB1 的 ss-PBCH-BlockPower。', true); return; }
-  const c = lbCfg(), p = +(+$('#ssPwr').value + 10 * Math.log10(c.nre)).toFixed(1);
-  $('#ruP').value = p; $('#ruP').dispatchEvent(new Event('change', { bubbles: true }));
-  status(`每埠輸出功率改為 ${p} dBm（SSB 每子載波 ${$('#ssPwr').value} dBm × ${c.nre} 個子載波，假設 PDSCH 與 SSB 每子載波功率相同）。`);
-});
 function lbCfg() {
   const bw = +$('#bw').value, scs = +$('#scs').value, nrb = NRB[scs][bw], nre = 12 * nrb, nf = +$('#nf').value || 0;
   const dev = (+$('#ruP').value || 0) - (+$('#cableL').value || 0) + (+$('#antG').value || 0);
@@ -2304,6 +2296,14 @@ $('#tbl').addEventListener('click', e => {
   const i = +tr.dataset.i; st.hi = st.hi === i ? null : i; highlight(st.hi);
 });
 ['#fMHz', '#mast'].forEach(s => $(s).addEventListener('change', () => { st.cache = {}; refresh(false); }));
+// ss-PBCH-BlockPower is the SSS EPRE per subcarrier at the antenna connector; with SSB and PDSCH at the same EPRE,
+// per-port output power = EPRE + 10·log10(number of subcarriers in the carrier)
+$('#ssApply').addEventListener('click', () => {
+  if ($('#ssPwr').value === '') { status('請先填 SIB1 的 ss-PBCH-BlockPower。', true); return; }
+  const c = lbCfg(), p = +(+$('#ssPwr').value + 10 * Math.log10(c.nre)).toFixed(1);
+  $('#ruP').value = p; $('#ruP').dispatchEvent(new Event('change', { bubbles: true }));
+  status(`每埠輸出功率改為 ${p} dBm（SSB 每子載波 ${$('#ssPwr').value} dBm × ${c.nre} 個子載波，假設 PDSCH 與 SSB 每子載波功率相同）。`);
+});
 ['#ruP', '#nPort', '#cableL', '#sasE', '#ssPwr', '#bw', '#scs', '#nf'].forEach(sel => $(sel).addEventListener('change', () => { syncLbNote(); refresh(false); }));
 $('#devL').addEventListener('change', () => applyExtra());
 $('#scen').addEventListener('change', () => applyExtra());
@@ -3164,7 +3164,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 17:45';
+const APP_VERSION = '2026-11-09 17:50';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
