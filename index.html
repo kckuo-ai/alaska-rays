@@ -2635,7 +2635,7 @@ $('#go').onclick = async () => {
     await new Promise(r => setTimeout(r, 30));
     const t0 = performance.now();
     refresh(true);
-    const noH = st.list.filter(b => b.src === 'default').length;
+    const noH = st.list.filter(b => b.src === 'default' || b.src === 'traced').length;
     if (!st.loadedOnce) { st.loadedOnce = true; setTab('cov', true); }
     status((st.osmNote ? st.osmNote + '\n' : '') + (st.traceMsg ? st.traceMsg + '\n' : '') + `完成：${st.osm.length} 棟建築（${noH} 棟無高度資料，用預設值），${RT.faceCount()} 面牆，計算 ${Math.round(performance.now() - t0)} ms。` +
       (bsBuilding < 0 ? '\n注意：BS 座標沒有落在任何 OSM 建築內，請手動填「BS 所在建築高度」。' : '') + (terrOn() ? '\n' + $('#terrNote').textContent : ''));
@@ -2917,7 +2917,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 15:20';
+const APP_VERSION = '2026-11-09 15:25';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
