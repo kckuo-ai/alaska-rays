@@ -954,7 +954,7 @@ const eirpFor = i => eirpTot() - (isMeasKey(i) ? measDelta() : 0);
 function link(r) {
   const c = lbCfg(), S = r.prx[r.sector];
   if (!Number.isFinite(S)) return null;
-  const I = r.prx.reduce((s, v, k) => (k === r.sector || !Number.isFinite(v)) ? s : s + Math.pow(10, v / 10), 0);
+  const I = (r.prxI || r.prx).reduce((s, v, k) => (k === r.sector || !Number.isFinite(v)) ? s : s + Math.pow(10, v / 10), 0);
   return { S, rsrp: S - 10 * Math.log10(c.nre), snr: S - c.noise, sinr: S - 10 * Math.log10(I + Math.pow(10, c.noise / 10)), hasI: !r.omni };
 }
 const RSRP_LV = [[-80, '很好', '#3ddc84'], [-90, '好', '#a8e05f'], [-100, '普通', '#ffd23f'], [-110, '弱', '#ff9f43'], [-Infinity, '很差', '#ff5e5e']];
@@ -1320,10 +1320,12 @@ function traceMulti(i) {
     g.paths.forEach(p => { const gain = ruPatt(a, u, p), q = Object.assign({}, p, { gain, pl: p.pl - gain, ru: r, tx }); c.ps.push(q); lin += Math.pow(10, (eirp - q.pl) / 10); });
     if (lin > 0) c.ru.push(lin);
   });
+  // serving cell is picked on SSB power (power sum); prx = useful signal (coherent JT if selected); prxI = power each cell adds as interference
+  const prxI = per.map(x => { const v = x.ru.reduce((a, b) => a + b, 0); return v > 0 ? 10 * Math.log10(v) : -Infinity; });
   const prx = per.map(x => { const v = combine(x.ru); return v > 0 ? 10 * Math.log10(v) : -Infinity; });
-  let serve = 0; prx.forEach((v, k) => { if (v > prx[serve]) serve = k; });
+  let serve = 0; prxI.forEach((v, k) => { if (v > prxI[serve]) serve = k; });
   const k = (st.secSel === 'auto' || st.sel === 'all' || +st.secSel >= K) ? serve : +st.secSel;
-  const ps = per[k].ps, out = { indoor, sector: k, serve, prx, omni: false, multi: true, total: ps.length, kept: [] };
+  const ps = per[k].ps, out = { indoor, sector: k, serve, prx, prxI, omni: false, multi: true, total: ps.length, kept: [] };
   if (!ps.length) return out;
   const best = Math.min(...ps.map(p => p.pl));
   ps.forEach(p => p.rel = best - p.pl);
@@ -1844,16 +1846,17 @@ async function runRUOpt() {
   const L = H.rus.map(() => new Float64Array(M));
   H.rus.forEach((r, n) => { if (active[n]) contrib(n, cfg[n].az, cfg[n].tilt, L[n]); });
   // per-cell sums (amplitudes for coherent JT) of every active RU except n; rebuilt once per RU
-  const base = new Float64Array(K * M);
-  const setBase = n => { base.fill(0); for (let u = 0; u < NR; u++) { if (!active[u] || u === n) continue; const k = cellOf[u], Lu = L[u]; for (let t = 0; t < M; t++) base[k * M + t] += coh ? Math.sqrt(Lu[t]) : Lu[t]; } };
+  const base = new Float64Array(K * M), baseA = new Float64Array(K * M);
+  const setBase = n => { base.fill(0); baseA.fill(0); for (let u = 0; u < NR; u++) { if (!active[u] || u === n) continue; const k = cellOf[u], Lu = L[u]; for (let t = 0; t < M; t++) { base[k * M + t] += Lu[t]; baseA[k * M + t] += Math.sqrt(Lu[t]); } } };
   const score = (n, cand, full) => {    // RU n contributes cand (all other active RUs come from base)
-    let ok = 0, marg = 0, rsrpOk = 0; const sinrs = full ? [] : null, Sk = new Float64Array(K), kn = n >= 0 ? cellOf[n] : -1;
+    let ok = 0, marg = 0, rsrpOk = 0; const sinrs = full ? [] : null, Pk = new Float64Array(K), Ak = new Float64Array(K), kn = n >= 0 ? cellOf[n] : -1;
     for (let t = 0; t < M; t++) {
-      for (let k = 0; k < K; k++) Sk[k] = base[k * M + t];
-      if (kn >= 0 && cand) Sk[kn] += coh ? Math.sqrt(cand[t]) : cand[t];
-      let k0 = 0, tot = 0; for (let k = 0; k < K; k++) { if (coh) Sk[k] *= Sk[k]; tot += Sk[k]; if (Sk[k] > Sk[k0]) k0 = k; }
-      if (Sk[k0] <= 0) { if (full) sinrs.push(-99); marg -= 10; continue; }
-      const rsrp = 10 * Math.log10(Sk[k0]) - off, sinr = 10 * Math.log10(Sk[k0] / (tot - Sk[k0] + noiseLin));
+      for (let k = 0; k < K; k++) { Pk[k] = base[k * M + t]; Ak[k] = baseA[k * M + t]; }
+      if (kn >= 0 && cand) { Pk[kn] += cand[t]; Ak[kn] += Math.sqrt(cand[t]); }
+      let k0 = 0, tot = 0; for (let k = 0; k < K; k++) { tot += Pk[k]; if (Pk[k] > Pk[k0]) k0 = k; }
+      const Sg = coh ? Ak[k0] * Ak[k0] : Pk[k0];
+      if (Sg <= 0) { if (full) sinrs.push(-99); marg -= 10; continue; }
+      const rsrp = 10 * Math.log10(Sg) - off, sinr = 10 * Math.log10(Sg / (tot - Pk[k0] + noiseLin));
       if (rsrp >= T) rsrpOk++;
       if (rsrp >= T && sinr >= S0) ok++;
       marg += Math.max(-10, Math.min(10, Math.min(rsrp - T, sinr - S0)));
@@ -2961,17 +2964,17 @@ function heatEval() {
   if (H.multi) {
     const KC = cellK(), cellOf = H.rus.map(r => cellIdx(st.rus[r])), coh = cohJT();
     for (let m = 0; m < H.pts.length; m++) {
-      const S = new Array(KC).fill(0); let bestRU = -1, bestLin = 0;
+      // P = power sum per cell (SSB: cell selection, and interference seen from other cells); A = amplitude sum for coherent JT
+      const P = new Array(KC).fill(0), A = new Array(KC).fill(0); let bestRU = -1, bestLin = 0;
       H.pts[m].ru.forEach((q, n) => {
         const r = H.rus[n], u = st.rus[r]; if (!ruActive(r)) return;
         let lin = 0;
         for (let j = 0; j < q.pl.length; j++) { pp.az = q.az[j]; pp.el = q.el[j]; lin += Math.pow(10, (c.eirpTot - q.pl[j] + ruPatt(a, u, pp)) / 10); }
-        S[cellOf[n]] += coh ? Math.sqrt(lin) : lin; if (lin > bestLin) { bestLin = lin; bestRU = r; }
+        P[cellOf[n]] += lin; A[cellOf[n]] += Math.sqrt(lin); if (lin > bestLin) { bestLin = lin; bestRU = r; }
       });
-      if (coh) for (let k = 0; k < KC; k++) S[k] *= S[k];
-      let k0 = 0; for (let k = 1; k < KC; k++) if (S[k] > S[k0]) k0 = k;
-      const tot = S.reduce((x, y) => x + y, 0);
-      out[m] = S[k0] > 0 ? { rsrp: 10 * Math.log10(S[k0]) - off, sinr: 10 * Math.log10(S[k0] / (tot - S[k0] + noiseLin)), k: k0, ru: bestRU, omni: false } : null;
+      let k0 = 0; for (let k = 1; k < KC; k++) if (P[k] > P[k0]) k0 = k;
+      const Sg = coh ? A[k0] * A[k0] : P[k0], I = P.reduce((x, y) => x + y, 0) - P[k0];
+      out[m] = Sg > 0 ? { rsrp: 10 * Math.log10(Sg) - off, sinr: 10 * Math.log10(Sg / (I + noiseLin)), k: k0, ru: bestRU, omni: false } : null;
     }
     return out;
   }
@@ -3177,7 +3180,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 18:50';
+const APP_VERSION = '2026-11-09 19:10';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
