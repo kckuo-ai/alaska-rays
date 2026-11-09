@@ -867,7 +867,10 @@ const SITES = {
     name: '高雄', matProfile: 'tw', store: 'khh', band: 'n79', tw: true, approx: true,
     bs: { lat: 22.7815028, lon: 120.4187782 },
     area: { lat: 22.7815028, lon: 120.4187782, r: 700 },
-    ues: ringUEs(22.7815028, 120.4187782, [[100, 0], [0, 100], [-100, 0], [0, -100], [212, 212], [-212, 212], [-212, -212], [212, -212]]),
+    // UEs inside the planned coverage polygon of the RU plan v2 (2026-11-09); UE 1 is the point Albert picked on site
+    ueKey: 'UEs_v2',
+    ues: [{ lat: 22.7816956, lon: 120.4188902 }, { lat: 22.7814, lon: 120.4177 }, { lat: 22.78178, lon: 120.41762 }, { lat: 22.782, lon: 120.4185 },
+      { lat: 22.78235, lon: 120.4192 }, { lat: 22.78268, lon: 120.4201 }, { lat: 22.78312, lon: 120.42045 }, { lat: 22.78362, lon: 120.41975 }],
     bsrc: ['osm'], files: {},
     // 高雄仁愛之家 RU 建議布點 v2 (KML, 2026-11-09): WNC R3210-079MT n79 100 MHz. Indoor RUs are map markers only for now.
     rus: { src: '高雄仁愛之家 RU 建議布點 v2（WNC R3210-079MT，n79 100 MHz）', tilt: 6, list: [{"id":"RU-C1-01-P","cell":1,"lat":22.78113168,"lon":120.4178977,"az":45.0,"indoor":false,"panel":true,"loc":"西南寢區南棟","mount":"屋頂走道（Panel 90° 朝東北）","use":"SW 群聚南段"},{"id":"RU-C1-02-P","cell":1,"lat":22.78157937,"lon":120.41746614,"az":80.0,"indoor":false,"panel":true,"loc":"西南寢區北棟","mount":"屋頂走道（Panel 90° 朝東）","use":"SW 群聚北段，銜接中央長廊"},{"id":"RU-C1-03-P","cell":1,"lat":22.78139927,"lon":120.41807939,"az":90.0,"indoor":false,"panel":true,"loc":"中央長廊西排南段","mount":"屋頂南角","use":"西排寢室南段"},{"id":"RU-C1-04-P","cell":1,"lat":22.78216089,"lon":120.41862259,"az":110.0,"indoor":false,"panel":true,"loc":"中央長廊西排北段","mount":"屋頂北角","use":"西排寢室北段"},{"id":"RU-C1-05-P","cell":1,"lat":22.78199875,"lon":120.41884472,"az":270.0,"indoor":false,"panel":true,"loc":"中央長廊東排南段","mount":"屋頂南角","use":"東排南段，對打中庭"},{"id":"RU-C1-06-P","cell":1,"lat":22.78337909,"lon":120.41934161,"az":250.0,"indoor":false,"panel":true,"loc":"中央長廊東排北段","mount":"屋頂北角","use":"東排北段"},{"id":"RU-C1-07-P","cell":1,"lat":22.78392165,"lon":120.42020189,"az":35.0,"indoor":false,"panel":true,"loc":"中央連接帶","mount":"長廊中段屋頂","use":"SW↔NE 連接帶弱波填補"},{"id":"RU-C1-08-P","cell":1,"lat":22.7828455,"lon":120.41960331,"az":300.0,"indoor":false,"panel":true,"loc":"東南 9 之 1 內緣","mount":"黃框東南內側棟屋頂","use":"東南內圈（黃框內）"},{"id":"RU-C2-01-P","cell":2,"lat":22.78326705,"lon":120.42007053,"az":135.0,"indoor":false,"panel":true,"loc":"大禮堂西棟","mount":"大禮堂群組西側屋頂","use":"Cell-2 西半"},{"id":"RU-C2-02-P","cell":2,"lat":22.78304293,"lon":120.42080563,"az":200.0,"indoor":false,"panel":true,"loc":"大禮堂東棟","mount":"大禮堂群組東側屋頂","use":"Cell-2 東半"},{"id":"RU-C3-01-Indoor","cell":3,"lat":22.78184225,"lon":120.41902111,"az":null,"indoor":true,"panel":false,"loc":"","mount":"","use":""},{"id":"RU-C3-02-Indoor-P","cell":3,"lat":22.78176537,"lon":120.41909387,"az":null,"indoor":true,"panel":true,"loc":"","mount":"","use":""},{"id":"RU-C3-03-Indoor","cell":3,"lat":22.78188814,"lon":120.41926864,"az":null,"indoor":true,"panel":false,"loc":"","mount":"","use":""},{"id":"RU-C3-04-Indoor","cell":3,"lat":22.78234882,"lon":120.41921824,"az":null,"indoor":true,"panel":false,"loc":"","mount":"","use":""},{"id":"RU-C3-05-Indoor-P","cell":3,"lat":22.78233052,"lon":120.41935883,"az":null,"indoor":true,"panel":true,"loc":"","mount":"","use":""}] },
@@ -893,7 +896,7 @@ const V2 = SITE.v2 || { tower: null, utc: '', rows: [] };
 const HAS_V2 = V2.rows.length > 0;
 const UE_H = 1.5, REL_CUT = 40, TOP_ALL = 3;
 const ORIG_UES = SITE.ues.map(u => ({ ...u }));
-try { const sv = JSON.parse(localStorage.getItem(SK('UEs')) || 'null'); if (Array.isArray(sv) && sv.length === SITE.ues.length && sv.every(u => Number.isFinite(u.lat) && Number.isFinite(u.lon))) SITE.ues = sv; } catch (e) {}
+try { const sv = JSON.parse(localStorage.getItem(SK(SITE.ueKey || 'UEs')) || 'null'); if (Array.isArray(sv) && sv.length === SITE.ues.length && sv.every(u => Number.isFinite(u.lat) && Number.isFinite(u.lon))) SITE.ues = sv; } catch (e) {}
 // 3GPP TS 38.101-1 Table 5.3.2-1 (FR1 max transmission bandwidth, N_RB)
 const NRB = {
   15: { 10: 52, 20: 106, 40: 216, 50: 270 },
@@ -934,7 +937,7 @@ function syncLbNote() {
   const ssTxt = ss == null ? '' : `SIB1 宣告 SSB 每子載波 ${fmt(ss)} dBm，加天線增益後約 ${fmt(ss + (+$('#antG').value || 0) - (+$('#cableL').value || 0))} dBm（模型目前用 ${fmt(c.eirpRE + c.extra)} dBm）。`;
   $('#lbNote').textContent = `每埠：設備能力 ${fmt(c.dev)} dBm，` + (curBand().sas ? `SAS 上限 ${Number.isFinite(c.sas) ? fmt(c.sas) : '—'} dBm（${c.bw} MHz${+$('#nPort').value > 1 ? '，由 ' + $('#nPort').value + ' 個埠平分' : ''}），` : '') + `採用 ${fmt(c.eirpCap)} dBm${c.sasLimited ? '，受 SAS 限制' : ''}。` + ssTxt + `${c.bw} MHz、SCS ${c.scs} kHz：${c.nrb} RB（${c.nre} 個子載波）。扣除額外損耗後總 EIRP ${fmt(c.eirpTot)} dBm，每個子載波 ${fmt(c.eirpRE)} dBm；雜訊底 ${fmt(c.noise)} dBm。時延解析度約 ${Math.round(1000 / c.bw)} ns。`;
 }
-const saveUEs = () => { try { localStorage.setItem(SK('UEs'), JSON.stringify(SITE.ues)); } catch (e) {} };
+const saveUEs = () => { try { localStorage.setItem(SK(SITE.ueKey || 'UEs'), JSON.stringify(SITE.ues)); } catch (e) {} };
 const $ = s => document.querySelector(s);
 const st = { h0: null, osm: null, sel: 0, cache: {}, viewer: null, tileset: null, hi: null, secSel: 'auto', picking: null, bKey: '' };
 let Mgeo, MgeoInv, Mdisp;
@@ -1586,7 +1589,7 @@ document.querySelectorAll('.panel input[type=number]').forEach(el => {
 });
 
 function setUE(i, lat, lon) {
-  SITE.ues[i] = { lat, lon }; delete st.cache[i]; saveUEs();
+  SITE.ues[i] = { lat, lon }; delete st.cache[i]; Object.keys(st.cache).forEach(k => { if (k.startsWith(i + '@')) delete st.cache[k]; }); saveUEs();
   const c = centerAndRadius(), m = Math.hypot((lat - c.lat) * 111320, (lon - c.lon) * 111320 * Math.cos(c.lat * Math.PI / 180));
   status(`UE ${i + 1} 移到 ${lat.toFixed(6)}, ${lon.toFixed(6)}。` + (m > c.r - 50 ? '\n注意：這個位置超出已載入的建築範圍，附近建築不會參與計算。' : ''), m > c.r - 50);
   refresh(false);
@@ -2761,7 +2764,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 12:10';
+const APP_VERSION = '2026-11-09 14:00';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
