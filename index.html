@@ -1370,6 +1370,8 @@ const STOPS = ['#5b6cff', '#e0479e', '#ffcc4d'].map(c => Cesium.Color.fromCssCol
 function ramp(t) { t = Math.max(0, Math.min(1, t)); const a = t < .5 ? 0 : 1, k = t < .5 ? t * 2 : (t - .5) * 2; return Cesium.Color.lerp(STOPS[a], STOPS[a + 1], k, new Cesium.Color()); }
 
 /* ===== drawing ===== */
+// RU + antenna marker: same triangle as the BS, white fill so the billboard color tints it (cell / RU colour); the black edge stays black.
+const RU_ICON = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="44" viewBox="0 0 48 44"><path d="M24 4 L44 40 L4 40 Z" fill="#fff" stroke="#000" stroke-width="5" stroke-linejoin="round"/></svg>');
 let raysDS, bldDS, siteDS, drawn = [];
 function drawSite() {
   siteDS.entities.removeAll();
@@ -1383,8 +1385,8 @@ function drawSite() {
     st.rus.forEach((u, r) => {
       const [x, z] = toLocal(u.lon, u.lat);
       if (u.indoor || !multi) {
-        siteDS.entities.add({ position: toWorld([x, RT.ground(x, z) + 3, z]), point: { pixelSize: 6, color: Cesium.Color.fromCssColorString(u.indoor ? '#9aa5b1' : '#ffffff').withAlpha(.8), outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-          label: { text: ruShort(u) + (u.indoor ? ' 室內' : ''), font: '10px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -11), fillColor: Cesium.Color.fromCssColorString('#cfd6de'), outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 900) } });
+        siteDS.entities.add({ position: toWorld([x, RT.ground(x, z) + 3, z]), billboard: { image: RU_ICON, width: 11, height: 10, color: Cesium.Color.fromCssColorString(u.indoor ? '#9aa5b1' : '#ffffff').withAlpha(.85), disableDepthTestDistance: Number.POSITIVE_INFINITY },
+          label: { text: ruShort(u) + (u.indoor ? ' 室內' : ''), font: '10px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -12), fillColor: Cesium.Color.fromCssColorString('#cfd6de'), outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 900) } });
         return;
       }
       const byRU = $('#hMetric').value === 'ru' && curTab === 'cov' && !!st.heat;
@@ -1392,8 +1394,8 @@ function drawSite() {
       siteDS.entities.add({ polyline: { positions: [toWorld([x, p0[1] - (+$('#mast').value || 0), z]), toWorld(p0)], width: 2, arcType: Cesium.ArcType.NONE, material: col } });
       if (ruActive(r)) { const b = u.az * Math.PI / 180, tl = (u.tilt + a.mech) * Math.PI / 180, L = 22;
         siteDS.entities.add({ polyline: { positions: [toWorld(p0), toWorld([p0[0] + L * Math.cos(tl) * Math.sin(b), p0[1] - L * Math.sin(tl), p0[2] + L * Math.cos(tl) * Math.cos(b)])], width: 7, arcType: Cesium.ArcType.NONE, material: new Cesium.PolylineArrowMaterialProperty(col) } }); }
-      siteDS.entities.add({ position: toWorld(p0), point: { pixelSize: 8, color: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 1.5, disableDepthTestDistance: Number.POSITIVE_INFINITY },
-        label: { text: ruShort(u) + (u.on ? '' : ' 停用'), scale: st.ruSolo === r ? 1.25 : 1, font: '600 11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -13), fillColor: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1200) } });
+      siteDS.entities.add({ position: toWorld(p0), billboard: { image: RU_ICON, width: 15, height: 14, color: col, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+        label: { text: ruShort(u) + (u.on ? '' : ' 停用'), scale: st.ruSolo === r ? 1.25 : 1, font: '600 11px sans-serif', pixelOffset: new Cesium.Cartesian2(0, -15), fillColor: col, outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, disableDepthTestDistance: Number.POSITIVE_INFINITY, distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1200) } });
     });
   }
   if (!multi) siteDS.entities.add({ polyline: { positions: [toWorld([0, tx[1] - (+$('#mast').value || 0), 0]), toWorld(tx)], width: 3, arcType: Cesium.ArcType.NONE, material: Cesium.Color.ORANGE } });
@@ -2909,7 +2911,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-09 15:01';
+const APP_VERSION = '2026-11-09 15:02';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
