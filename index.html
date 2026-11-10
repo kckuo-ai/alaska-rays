@@ -1632,15 +1632,24 @@ async function measure3D(onlyIdx) {
       if (buf.length >= BATCH) { await flush(); status(`從 3D 模型量建築高度… ${Object.keys(res).length}/${jobs.length}`); }
     }
     await flush();
-    const cmp = [];
+    const cmp = [], got3 = {}, hs = [];
     for (const j of jobs) {
       const r = res[j.i], id = st.osm[j.i].id;
       if (!r || r.inn.length < 1 || r.out.length < 2) { bad++; continue; }
       const roof = pctlI(r.inn, r.inn.length >= 6 ? 0.75 : 0.5), ground = pctlI(r.out, 0.2), h = roof - ground;
-      if (!(h >= 2 && h <= 200)) { bad++; continue; }
-      st.h3d[id] = [+h.toFixed(1), r.inn.length, r.out.length]; ok++;
+      hs.push(h);
+      if (!(h >= 2.5 && h <= 200)) { bad++; continue; }
+      got3[id] = [+h.toFixed(1), r.inn.length, r.out.length]; ok++;
       if (st.hOv[id] != null) cmp.push(h - st.hOv[id]);
     }
+    // Where Google has no photogrammetric mesh (much of rural Taiwan) the "3D" tiles are imagery draped on terrain:
+    // roofs then sample at ground level. Detect that and keep nothing rather than store ~2 m buildings.
+    const flat = hs.filter(h => h < 2.5).length, medH = pctlI(hs, 0.5);
+    if (!ok || hs.length >= 5 && (flat / hs.length > 0.4 || medH < 3)) {
+      st.m3dMsg = `這一帶的 Google 3D 只有影像貼在地形上，沒有立體建物模型（取樣的 ${hs.length} 棟中 ${flat} 棟屋頂和地面幾乎同高，中位數 ${fmt(medH)} m），量不到建築高度，沒有寫入任何數值。`;
+      status(st.m3dMsg, true); return;
+    }
+    Object.assign(st.h3d, got3);
     saveH3d(); st.cache = {}; refresh(true);
     const mae = cmp.length ? cmp.reduce((a, d) => a + Math.abs(d), 0) / cmp.length : null, bias = cmp.length ? cmp.reduce((a, d) => a + d, 0) / cmp.length : null;
     st.m3dMsg = `從 3D 模型量到 ${ok} 棟建築的高度` + (bad ? `，${bad} 棟量不到（太小、被樹遮或旁邊沒有空地）` : '') + `，耗時 ${((performance.now() - t0) / 1000).toFixed(0)} 秒。` +
@@ -3441,7 +3450,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-10 09:30';
+const APP_VERSION = '2026-11-10 09:45';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -3608,6 +3617,7 @@ Object.assign(EN, {"建築材料（穿透損耗）": "Building material (penetra
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
+  [/^這一帶的 Google 3D 只有影像貼在地形上，沒有立體建物模型（取樣的 (\d+) 棟中 (\d+) 棟屋頂和地面幾乎同高，中位數 ([\d.]+) m），量不到建築高度，沒有寫入任何數值。$/, 'Google 3D here is only imagery draped on the terrain, with no building geometry ($2 of $1 sampled buildings have roof and ground at about the same height, median $3 m), so heights cannot be measured; nothing was stored.'],
   [/^從 3D 模型量建築高度… (\d+)\/(\d+)$/, 'Measuring building heights on the 3D model… $1/$2'],
   [/^從 3D 模型量到 (\d+) 棟建築的高度/, 'Measured $1 building heights on the 3D model'],
   [/，(\d+) 棟量不到（太小、被樹遮或旁邊沒有空地）/, '; $1 could not be measured (too small, under trees or no open ground beside them)'],
