@@ -3596,7 +3596,7 @@ heatEstimate();
 $('#showH').addEventListener('change', () => { if (heatEnt) heatEnt.show = $('#showH').checked; });
 
 /* ===== layout: tabs, summary bar, map layers, phone bottom sheet ===== */
-const APP_VERSION = '2026-11-10 10:20';
+const APP_VERSION = '2026-11-10 10:30';
 document.querySelectorAll('.appver').forEach(el => { el.textContent = '版本 ' + APP_VERSION; });
 // Update check: a home-screen web app has no address bar or reload button, and GitHub Pages lets the HTML be cached
 // for about 10 minutes, so ask the server for version.json directly and offer a reload that bypasses the cache.
@@ -3763,11 +3763,11 @@ Object.assign(EN, {"建築材料（穿透損耗）": "Building material (penetra
 const EN_KEYS = Object.keys(EN).sort((a, b) => b.length - a.length);
 // whole-sentence patterns first, so composed messages read naturally in English
 const EN_RX = [
-  [/^建築為內政部國土測繪中心三維建物（(.+?)，(\d+) 棟，含官方建物高度）。$/, 'Buildings from the MOI NLSC 3D building models ($1, $2 buildings, with official heights).'],
-  [/^建築為內政部國土測繪中心三維建物（(.+?)，(\d+) 棟，(.+?) 下載的快取）。$/, 'Buildings from the MOI NLSC 3D building models ($1, $2 buildings, cached $3).'],
+  [/建築為內政部國土測繪中心三維建物（(.+?)，(\d+) 棟，含官方建物高度）。/, 'Buildings from the MOI NLSC 3D building models (' + '$1, $2 buildings, with official heights).'],
+  [/建築為內政部國土測繪中心三維建物（(.+?)，(\d+) 棟，(.+?) 下載的快取）。/, 'Buildings from the MOI NLSC 3D building models ($1, $2 buildings, cached $3).'],
   [/^下載國土測繪中心三維建物索引（(.+?)，約 50 MB，只有第一次需要）…$/, 'Downloading the NLSC 3D building index ($1, about 50 MB, first time only)…'],
   [/^下載三維建物圖磚 (\d+)\/(\d+)，已取得 (\d+) 棟…$/, 'Downloading 3D building tiles $1/$2, $3 buildings so far…'],
-  [/^先前從電子地圖描出的建築有 (\d+) 棟和三維建物重疊，已改用三維建物；其餘 (\d+) 棟保留。$/, '$1 buildings traced earlier from the e-map overlap the 3D models and were replaced; the other $2 are kept.'],
+  [/先前從電子地圖描出的建築有 (\d+) 棟和三維建物重疊，已改用三維建物；其餘 (\d+) 棟保留。/, '$1 buildings traced earlier from the e-map overlap the 3D models and were replaced; the other $2 are kept.'],
   [/^這一帶的 Google 3D 只有影像貼在地形上，沒有立體建物模型（取樣的 (\d+) 棟中 (\d+) 棟屋頂和地面幾乎同高，中位數 ([\d.]+) m），量不到建築高度，沒有寫入任何數值。$/, 'Google 3D here is only imagery draped on the terrain, with no building geometry ($2 of $1 sampled buildings have roof and ground at about the same height, median $3 m), so heights cannot be measured; nothing was stored.'],
   [/^從 3D 模型量建築高度… (\d+)\/(\d+)$/, 'Measuring building heights on the 3D model… $1/$2'],
   [/^從 3D 模型量到 (\d+) 棟建築的高度/, 'Measured $1 building heights on the 3D model'],
