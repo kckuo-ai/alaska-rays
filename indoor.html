@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>SiteLens 室內覆蓋</title>
+<style>
+/* SiteLens indoor module. Same visual world as the outdoor page (index.html): dark single theme, amber accent.
+   Layout: floor-plan canvas on the left, tabbed panel on the right; on phones the panel sits under the canvas and collapses. */
+:root{
+  --bg:#10151b; --panel:#171e26; --fg:#e4e9ee; --muted:#93a1af; --line:#2a3541; --accent:#ffb347; --ue:#4fd1e0; --bad:#ff7a7a; --good:#3ddc84;
+  --paper:#f3f1ec;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--body);overflow:hidden}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 420px;height:100%}
+#stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:#0b0f14}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;display:block}
+#cv.sel{cursor:default}
+button{font:500 13px var(--body);background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#1a1205;border-color:var(--accent)}
+button.danger{color:var(--bad)}
+button[aria-pressed=true]{background:var(--ue);color:#04262b;border-color:var(--ue)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select,input[type=text],input[type=number]{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font:13px var(--mono);width:100%;max-width:100%}
+input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+a{color:var(--accent);text-underline-offset:2px}
+/* floating controls on the canvas */
+#tools{position:absolute;left:10px;top:10px;right:10px;z-index:5;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+#tools>*{pointer-events:auto}
+.tb{display:flex;background:rgba(16,21,27,.94);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tb button{border:0;border-radius:0;min-height:40px;min-width:44px;padding:0 11px;border-right:1px solid var(--line)}
+.tb button:last-child{border-right:0}
+.tb button[aria-pressed=true]{background:var(--accent);color:#1a1205;font-weight:700}
+#mats{flex:1 1 100%;min-width:0;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+#mats::-webkit-scrollbar{display:none}
+#mats button{flex:none;display:flex;align-items:center;gap:6px;min-height:36px;background:rgba(16,21,27,.94);border-radius:18px;padding:0 12px 0 9px;white-space:nowrap}
+#mats button i{width:12px;height:12px;border-radius:3px;display:block;border:1px solid rgba(0,0,0,.5)}
+#mats button small{font:11px var(--mono);color:var(--muted)}
+#mats button[aria-pressed=true]{background:#24303c;color:var(--fg);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+#hint{position:absolute;left:124px;right:10px;bottom:8px;z-index:4;background:rgba(16,21,27,.9);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--fg);pointer-events:none}
+#selbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:6;background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+#selbar .ttl{font-weight:700;font-size:13px}
+#selbar .txt{font:12px/1.5 var(--mono);color:var(--fg);flex:1 1 100%}
+#selbar .txt b{color:var(--accent);font-weight:500}
+#selbar select{width:auto;min-width:9em;flex:1 1 9em;min-height:38px;font-size:16px}
+#selbar input[type=number]{width:5.5em;min-height:38px;font-size:16px}
+#selbar button{min-height:38px}
+#selbar .sp{flex:1}
+#selbar label{display:flex;align-items:center;gap:6px;font-size:13px}
+#zoomc{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:4;display:flex;flex-direction:column}
+#zoomc.tb{flex-direction:column}
+#zoomc button{border-right:0;border-bottom:1px solid var(--line);font-size:17px;min-height:40px}
+#zoomc button:last-child{border-bottom:0}
+#busy{position:absolute;right:10px;bottom:10px;z-index:3;font:11px var(--mono);color:var(--muted);background:rgba(16,21,27,.85);border-radius:4px;padding:2px 6px}
+/* panel */
+.panel{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;min-width:0;height:100%;background:var(--bg)}
+.handle{display:none}
+.phead{padding:12px 18px 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.phead h1{margin:0;font-size:18px;letter-spacing:.02em}
+.phead h1 small{font-size:13px;color:var(--accent);font-weight:500;margin-left:6px}
+.phead a{font-size:13px;white-space:nowrap}
+.sumbar{padding:2px 18px 8px;font:12px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.sumbar b{color:var(--fg);font-weight:500}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 10px;flex:none}
+.tabs button{flex:1;border:0;border-radius:0;background:transparent;color:#b5c0cb;padding:9px 2px;font-size:13px;border-bottom:3px solid transparent;min-width:0;min-height:44px}
+.tabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent);background:transparent;font-weight:700}
+.pbody{flex:1;min-height:0;overflow-y:auto;padding:14px 18px 28px}
+.pbody>section{display:none;flex-direction:column;gap:12px}
+.pbody>section.on{display:flex}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.block h2{margin:0;font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.block p{margin:0;font-size:12px;color:var(--muted)}
+.block p b{color:var(--fg);font-weight:500}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 10px}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btns button{flex:1 1 auto;min-height:40px}
+.seg{display:flex;gap:4px}
+.seg button{flex:1;min-height:40px}
+.warn{color:var(--accent)!important}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--bg)}
+.tile dt{font-size:11px;color:var(--muted)}
+.tile dd{margin:0;font:500 20px var(--mono);font-variant-numeric:tabular-nums}
+.tile dd small{font-size:11px;color:var(--muted);margin-left:3px}
+dl{margin:0}
+.lv{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:4px 8px;align-items:center;font-size:12px}
+.lv i{width:12px;height:12px;border-radius:2px;display:block}
+.lv span:last-child{font:12px var(--mono);text-align:right;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-weight:500;color:var(--muted);text-align:right;padding:4px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;font:12px var(--mono);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left;font-family:var(--body)}
+td input[type=number]{width:4.8em;padding:4px 6px;text-align:right}
+td small{display:block;color:var(--muted);font:11px var(--body)}
+.tw{overflow-x:auto}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;border:1px solid rgba(0,0,0,.5);vertical-align:-1px}
+.rucard{border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.rucard.cur{border-color:var(--accent)}
+.rucard .hd{display:flex;align-items:center;gap:8px}
+.rucard .hd input[type=text]{flex:1;font-family:var(--body);font-weight:700}
+.rucard .dot{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid #fff}
+.foot{font:11px var(--mono);color:var(--muted)}
+#sheet{position:fixed;inset:0;z-index:60;background:rgba(5,8,11,.6);display:flex;align-items:flex-start;justify-content:center;padding:calc(14px + env(safe-area-inset-top,0px)) 10px 10px}
+#sheet .box{width:min(100%,460px);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+#sheet .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#sheet .hd b{font-size:15px}
+#sheet p{margin:0;font-size:13px;color:var(--muted)}
+#sheet textarea{width:100%;height:150px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;font:11px var(--mono);padding:6px}
+#sheet img{max-width:100%;border-radius:4px;background:#fff}
+#sheet input{font-size:16px;min-height:42px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:70;max-width:min(92vw,520px);background:#f3f5f7;color:#10151b;border-radius:6px;padding:8px 12px;font-size:13px;line-height:1.45;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+#updBar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:65;display:flex;gap:10px;align-items:center;padding:6px 6px 6px 14px;background:#ffb347;color:#1a1205;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.45);font-size:14px;white-space:nowrap}
+#updBar button{border:0;border-radius:8px;min-height:40px;padding:0 14px;background:#1a1205;color:#ffb347;font-weight:700}
+@media (max-width:1023px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .panel{border-left:0;border-top:1px solid var(--line);height:50vh;height:50dvh;transition:height .2s ease}
+  .panel.peek{height:auto}
+  .panel.peek .pbody{display:none}
+  .handle{all:unset;display:flex;justify-content:center;align-items:center;height:22px;flex:none;cursor:pointer;width:100%}
+  .handle::before{content:"";width:44px;height:4px;border-radius:2px;background:#4a5866}
+  .phead{padding:0 14px 2px}
+  .phead h1{font-size:15px}
+  .sumbar{padding:0 14px 6px}
+  .pbody{padding:12px 14px 24px}
+  select,input[type=text],input[type=number]{font-size:16px;min-height:40px}
+  td input[type=number]{font-size:16px;min-height:36px}
+}
+@media (prefers-reduced-motion:reduce){.panel{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <main id="stage">
+    <canvas id="cv" aria-label="平面圖與覆蓋熱圖"></canvas>
+    <div id="tools">
+      <div class="tb" id="toolbar" role="group" aria-label="繪圖工具">
+        <button type="button" data-tool="sel" aria-pressed="true">選取</button>
+        <button type="button" data-tool="wall" aria-pressed="false">牆</button>
+        <button type="button" data-tool="door" aria-pressed="false">門</button>
+        <button type="button" data-tool="rect" aria-pressed="false">電梯</button>
+        <button type="button" data-tool="ru" aria-pressed="false">RU</button>
+        <button type="button" data-tool="pt" aria-pressed="false">測點</button>
+      </div>
+      <div class="tb"><button type="button" id="undo" disabled>復原</button><button type="button" id="done" hidden>完成</button></div>
+      <div id="mats" hidden></div>
+    </div>
+    <div class="tb" id="zoomc"><button type="button" id="zin" aria-label="放大">＋</button><button type="button" id="zout" aria-label="縮小">−</button><button type="button" id="zfit" aria-label="全圖">⤢</button></div>
+    <div id="hint"></div>
+    <div id="busy" hidden>計算中…</div>
+    <div id="selbar" hidden></div>
+  </main>
+  <aside class="panel" id="panel">
+    <button type="button" class="handle" id="handle" aria-label="展開或收合面板"></button>
+    <div class="phead"><h1>SiteLens<small>室內覆蓋</small></h1><a href="index.html">‹ 室外站點</a></div>
+    <div class="sumbar" id="sum"></div>
+    <nav class="tabs" id="tabs" aria-label="面板分頁">
+      <button type="button" data-tab="plan" aria-pressed="true">平面圖</button>
+      <button type="button" data-tab="mat" aria-pressed="false">材質</button>
+      <button type="button" data-tab="ru" aria-pressed="false">RU</button>
+      <button type="button" data-tab="cov" aria-pressed="false">覆蓋</button>
+      <button type="button" data-tab="pts" aria-pressed="false">測點</button>
+    </nav>
+    <div class="pbody">
+      <section data-tab="plan" class="on">
+        <div class="block">
+          <h2>專案</h2>
+          <label class="f">目前的平面<select id="projSel"></select></label>
+          <div class="btns"><button type="button" id="pNew">新增空白</button><button type="button" id="pName">改名</button><button type="button" id="pDemo">示範平面</button><button type="button" id="pDel" class="danger">刪除</button></div>
+        </div>
+        <div class="block">
+          <h2>平面圖</h2>
+          <p id="planInfo"></p>
+          <div class="btns"><button type="button" class="primary" id="upPlan">上傳平面圖（圖片或 PDF）</button><button type="button" id="rmPlan">移除底圖</button></div>
+          <label class="f">底圖濃度<input type="range" id="planA" min="0" max="100" value="100"></label>
+        </div>
+        <div class="block">
+          <h2>比例尺</h2>
+          <p id="scaleInfo"></p>
+          <div class="btns"><button type="button" id="setScale">在圖上量兩點設定</button></div>
+        </div>
+        <div class="block">
+          <h2>評估範圍</h2>
+          <p id="areaInfo"></p>
+          <div class="btns"><button type="button" id="setArea">框選範圍</button><button type="button" id="clrArea">用全部牆面的外框</button></div>
+        </div>
+        <div class="block">
+          <h2>備份與交換</h2>
+          <p>資料只存在這台裝置的瀏覽器。換裝置或給同事時，用專案檔帶過去。</p>
+          <div class="btns"><button type="button" id="expProj">匯出專案檔</button><button type="button" id="impProj">匯入專案檔</button></div>
+        </div>
+        <p class="foot"><span id="ver"></span> · <button type="button" id="chkUpd" style="all:unset;cursor:pointer;color:var(--accent);text-decoration:underline">檢查更新</button></p>
+      </section>
+      <section data-tab="mat">
+        <div class="block">
+          <h2>材質與穿透損耗</h2>
+          <p>每穿過一面就扣一次。數值隨頻率變；改成自己量到的值就會固定，不再跟頻率走。</p>
+          <div class="tw"><table id="matTbl"></table></div>
+        </div>
+        <div class="block">
+          <h2>圖上的物件</h2>
+          <p id="objInfo"></p>
+          <div class="btns"><button type="button" id="clrObjs" class="danger">清除全部牆、門、電梯</button></div>
+        </div>
+      </section>
+      <section data-tab="ru">
+        <div class="block">
+          <h2>頻段與載波</h2>
+          <div class="row2">
+            <label class="f">頻段<select id="band"></select></label>
+            <label class="f">中心頻率 MHz<input type="number" id="freq" step="1"></label>
+            <label class="f">頻寬 MHz<select id="bw"></select></label>
+            <label class="f">子載波間距 kHz<select id="scs"><option>15</option><option selected>30</option><option>60</option></select></label>
+          </div>
+        </div>
+        <div class="block">
+          <h2>RU</h2>
+          <p>用上方「RU」工具在圖上點位置。Cell 編號相同的 RU 視為同一個 Cell，訊號相加；不同 Cell 互為同頻干擾。</p>
+          <div id="ruList" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+        <div class="block">
+          <h2>模型與終端</h2>
+          <div class="row2">
+            <label class="f">路徑損耗指數 n<input type="number" id="pln" step="0.1" min="1.5" max="4"></label>
+            <label class="f">額外損耗 dB<input type="number" id="extra" step="0.5"></label>
+            <label class="f">終端高度 m<input type="number" id="ueH" step="0.1" min="0"></label>
+            <label class="f">終端雜訊指數 dB<input type="number" id="nf" step="0.5"></label>
+            <label class="f">鄰區負載 %<input type="number" id="load" step="5" min="0" max="100"></label>
+            <label class="f">最多 MIMO 層數<select id="layers"><option>1</option><option>2</option><option>4</option></select></label>
+            <label class="f">下行時槽占比 %<input type="number" id="dl" step="1" min="10" max="100"></label>
+          </div>
+          <p>路徑損耗 = 1 m 自由空間損耗 + 10·n·log₁₀(d) + 各面牆的穿透損耗 + 額外損耗。牆已經逐面計算，所以 n 預設 2.0。</p>
+        </div>
+      </section>
+      <section data-tab="cov">
+        <div class="block">
+          <h2>熱圖</h2>
+          <div class="seg" id="metric" role="group" aria-label="熱圖指標">
+            <button type="button" data-m="rsrp" aria-pressed="true">RSRP</button>
+            <button type="button" data-m="sinr" aria-pressed="false">SINR</button>
+            <button type="button" data-m="tput" aria-pressed="false">下行速率</button>
+            <button type="button" data-m="srv" aria-pressed="false">服務 RU</button>
+          </div>
+          <div class="lv" id="legend"></div>
+          <label class="f">熱圖濃度<input type="range" id="heatA" min="0" max="100" value="62"></label>
+        </div>
+        <div class="block">
+          <h2>範圍內統計</h2>
+          <dl class="tiles" id="tiles"></dl>
+          <p id="gridInfo"></p>
+        </div>
+        <div class="block">
+          <h2>輸出</h2>
+          <div class="btns"><button type="button" id="expImg">輸出覆蓋圖</button></div>
+        </div>
+        <div class="block">
+          <h2>這個模型算什麼、不算什麼</h2>
+          <p>多牆模型：RU 到每個點拉一條直線，算距離衰減和穿過的每面牆。不算反射和繞射，所以繞過門口、沿走廊傳進去的訊號會被低估；鐵門和電梯後方的結果偏保守。</p>
+          <p>沒有實測校正時，誤差大約 6–10 dB。到「測點」分頁填入現場量到的 RSRP，可以校正額外損耗。</p>
+        </div>
+      </section>
+      <section data-tab="pts">
+        <div class="block">
+          <h2>測點</h2>
+          <p>用上方「測點」工具在圖上點位置。填入現場量到的 RSRP 就能和預測比對。</p>
+          <div class="tw"><table id="ptTbl"></table></div>
+        </div>
+        <div class="block">
+          <h2>用實測校正</h2>
+          <p id="calInfo"></p>
+          <div class="btns"><button type="button" id="calGo">把平均誤差併入額外損耗</button></div>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+<div id="sheet" hidden><div class="box" id="sheetBox"></div></div>
+<div id="toast" hidden role="status"></div>
+<div id="updBar" hidden><span id="updMsg"></span><button type="button" id="updGo">重新載入</button></div>
+<input type="file" id="fPlan" accept="image/*,application/pdf,.pdf" hidden>
+<input type="file" id="fProj" accept=".json,application/json" hidden>
+
+<script>
+/* ===== Engine IN: pure maths, no DOM, so it can be regression-tested in Node (same split as RT in index.html). =====
+   All geometry in metres. Multi-wall model: PL = FSPL(1 m) + 10 n log10(d3D) + sum(wall losses) + extra. */
+const IN = (() => {
+  // loss(dB) = a + b·f(GHz). src '38.901' = 3GPP TR 38.901 Table 7.4.3-1; the rest are common indoor planning values.
+  const MATS = {
+    dry:   { n: '輕隔間（石膏板）', a: 2.5, b: 0.3, c: '#58b7ff', use: 'w', src: '規劃常用值' },
+    wood:  { n: '木隔間／木門', a: 4.85, b: 0.12, c: '#c98b4b', use: 'wd', src: 'TR 38.901' },
+    glass: { n: '玻璃', a: 2, b: 0.2, c: '#2fd9c8', use: 'wd', src: 'TR 38.901' },
+    brick: { n: '磚牆', a: 6, b: 1.2, c: '#e8663f', use: 'w', src: '規劃常用值' },
+    conc:  { n: '混凝土（RC）', a: 5, b: 4, c: '#e3e8ee', use: 'wr', src: 'TR 38.901' },
+    thick: { n: '厚 RC（剪力牆、樓梯間）', a: 10, b: 5, c: '#8f99a6', use: 'wr', src: '規劃常用值' },
+    irr:   { n: '鍍膜玻璃（Low-E）', a: 23, b: 0.3, c: '#5b7dff', use: 'w', src: 'TR 38.901' },
+    metal: { n: '鐵門／防火門', a: 20, b: 0.5, c: '#ff4fa3', use: 'd', src: '規劃常用值' },
+    shut:  { n: '鐵捲門', a: 25, b: 0.5, c: '#b660ff', use: 'd', src: '規劃常用值' },
+    elev:  { n: '電梯（金屬車廂）', a: 30, b: 0, c: '#ffd23f', use: 'r', src: '規劃常用值' },
+    cust:  { n: '自訂', a: 10, b: 0, c: '#7dff8a', use: 'wdr', src: '自己填' }
+  };
+  const NRB = {
+    15: { 5: 25, 10: 52, 20: 106, 40: 216, 50: 270 },
+    30: { 10: 24, 20: 51, 40: 106, 50: 133, 80: 217, 90: 245, 100: 273 },
+    60: { 10: 11, 20: 24, 40: 51, 50: 65, 80: 107, 90: 121, 100: 135 }
+  };
+  const matLoss = (id, fGHz, ov) => (ov && Number.isFinite(ov[id])) ? ov[id] : MATS[id].a + MATS[id].b * fGHz;
+  const objLoss = (o, fGHz, ov) => o.k === 'door' && o.open ? 0 : o.m === 'cust' ? (+o.cust || 0) : matLoss(o.m, fGHz, ov);
+  // objects (plan units) -> flat segment lists in metres. Walls and rect faces: W; doors: D. Each seg: x1,y1,x2,y2,loss,objIndex
+  function build(objs, mpp, fGHz, ov) {
+    const W = [], D = [];
+    objs.forEach((o, i) => {
+      const L = objLoss(o, fGHz, ov), a = o.x1 * mpp, b = o.y1 * mpp, c = o.x2 * mpp, d = o.y2 * mpp;
+      if (o.k === 'rect') W.push(a, b, c, b, L, i, c, b, c, d, L, i, c, d, a, d, L, i, a, d, a, b, L, i);
+      else (o.k === 'door' ? D : W).push(a, b, c, d, L, i);
+    });
+    return { W: Float64Array.from(W), D: Float64Array.from(D) };
+  }
+  // crossing parameter t along A->B, or -1. Half-open on the wall so a ray through a shared vertex counts once.
+  function isect(ax, ay, bx, by, x1, y1, x2, y2) {
+    const rx = bx - ax, ry = by - ay, sx = x2 - x1, sy = y2 - y1, den = rx * sy - ry * sx;
+    if (den > -1e-12 && den < 1e-12) return -1;
+    const qx = x1 - ax, qy = y1 - ay, t = (qx * sy - qy * sx) / den, u = (qx * ry - qy * rx) / den;
+    return t > 1e-9 && t < 1 - 1e-9 && u >= 0 && u < 1 ? t : -1;
+  }
+  // total penetration loss along A->B. A door replaces the wall it sits in (crossings within 0.3 m of a door crossing).
+  const dts = new Float64Array(64);
+  function wallLoss(S, ax, ay, bx, by, hits) {
+    const W = S.W, D = S.D, len = Math.hypot(bx - ax, by - ay);
+    let sum = 0, nd = 0;
+    for (let k = 0; k < D.length; k += 6) {
+      const t = isect(ax, ay, bx, by, D[k], D[k + 1], D[k + 2], D[k + 3]);
+      if (t < 0) continue;
+      if (nd < 64) dts[nd++] = t;
+      sum += D[k + 4]; if (hits) hits.push(D[k + 5]);
+    }
+    for (let k = 0; k < W.length; k += 6) {
+      const t = isect(ax, ay, bx, by, W[k], W[k + 1], W[k + 2], W[k + 3]);
+      if (t < 0) continue;
+      let cov = false;
+      for (let j = 0; j < nd; j++) if (Math.abs(dts[j] - t) * len < 0.3) { cov = true; break; }
+      if (cov) continue;
+      sum += W[k + 4]; if (hits) hits.push(W[k + 5]);
+    }
+    return sum;
+  }
+  // 3GPP horizontal pattern, Am = 25 dB. az: 0° = up on the plan, clockwise (plan y points down).
+  function pat(ru, dx, dy) {
+    if (!ru.dir) return 0;
+    let a = Math.atan2(dx, -dy) * 180 / Math.PI - ru.az;
+    a = ((a + 540) % 360) - 180;
+    return Math.min(12 * (a / (ru.bw || 65)) ** 2, 25);
+  }
+  // truncated Shannon (TR 36.942 A.2: alpha 0.6), capped at 256QAM 948/1024 (7.4063 b/s/Hz per layer)
+  const se = s => s < -10 ? 0 : Math.min(0.6 * Math.log2(1 + 10 ** (s / 10)), 7.4063);
+  function model(cfg) {
+    const scs = +cfg.scs, nrb = (NRB[scs] || NRB[30])[cfg.bw] || 106, nre = 12 * nrb;
+    const m = {
+      fsl1: 20 * Math.log10(cfg.f) - 27.55, n: +cfg.n || 2, extra: +cfg.extra || 0, ueH: +cfg.ueH || 0,
+      nreDb: 10 * Math.log10(nre), noise: 10 ** ((-174 + 10 * Math.log10(scs * 1e3) + (+cfg.nf || 0)) / 10),
+      load: Math.max(0, Math.min(1, (cfg.load == null ? 100 : +cfg.load) / 100)), layers: +cfg.layers || 1,
+      // occupied bandwidth × DL share × (1 − 0.14 overhead, TS 38.306 FR1 DL), in MHz
+      bwEff: nre * scs * 1e3 * ((+cfg.dl || 74) / 100) * 0.86 / 1e6, nrb, nre
+    };
+    m.tput = s => { let best = 0; for (let r = 1; r <= m.layers; r++) { const v = r * se(s - 10 * Math.log10(r)); if (v > best) best = v; } return best * m.bwEff; };
+    m.peak = m.tput(60);
+    return m;
+  }
+  // per-RU RSRP (dBm per RE) at a point
+  function ruRsrp(m, S, ru, x, y, hits) {
+    const dx = x - ru.x, dy = y - ru.y, d3 = Math.hypot(dx, dy, (ru.h || 0) - m.ueH);
+    const pl = m.fsl1 + 10 * m.n * Math.log10(Math.max(d3, 1)) + wallLoss(S, ru.x, ru.y, x, y, hits) + m.extra;
+    return ru.p + ru.g - pat(ru, dx, dy) - m.nreDb - pl;
+  }
+  // rus: active RUs in metres. Returns combined-cell RSRP, SINR, DL Mbps, serving RU index (into rus)
+  function evalAt(m, S, rus, x, y) {
+    if (!rus.length) return null;
+    const per = rus.map(r => ruRsrp(m, S, r, x, y)), cell = new Map();
+    let tot = 0;
+    per.forEach((v, i) => { const w = 10 ** (v / 10); tot += w; cell.set(rus[i].cell, (cell.get(rus[i].cell) || 0) + w); });
+    let bc = null, s = 0; cell.forEach((w, c) => { if (w > s) { s = w; bc = c; } });
+    let ru = -1, bv = -Infinity; per.forEach((v, i) => { if (rus[i].cell === bc && v > bv) { bv = v; ru = i; } });
+    const sinr = 10 * Math.log10(s / (m.load * (tot - s) + m.noise));
+    return { rsrp: 10 * Math.log10(s), sinr, tput: m.tput(sinr), ru, per };
+  }
+  return { MATS, NRB, matLoss, objLoss, build, isect, wallLoss, pat, se, model, ruRsrp, evalAt };
+})();
+if (typeof module !== 'undefined') module.exports = IN;
+</script>
+<script>
+/* ===== Page logic ===== */
+const IND_VERSION = '2026-11-13 22:40';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (v, d = 0) => Number.isFinite(v) ? v.toFixed(d) : '—';
+const uid = () => Math.random().toString(36).slice(2, 9);
+const LS = 'SLin:';   // own key prefix: nothing here touches the outdoor module's storage
+const BANDS = {
+  n48: { f: 3625, lbl: 'n48 CBRS（3550–3700）' }, n77: { f: 3750, lbl: 'n77（3300–4200）' }, n78: { f: 3500, lbl: 'n78（3300–3800）' },
+  n79: { f: 4850, lbl: 'n79（4400–5000）' }, n41: { f: 2593, lbl: 'n41（2496–2690）' }, n1: { f: 2140, lbl: 'n1（下行 2110–2170）' },
+  n3: { f: 1842, lbl: 'n3（下行 1805–1880）' }, cust: { f: 3500, lbl: '自訂頻率' }
+};
+const RU_COL = ['#ff8a3d', '#4fd1e0', '#c77dff', '#3ddc84', '#ff5d8f', '#ffd23f', '#6d8bff', '#a3e635'];
+const RAMP = {
+  rsrp: { stops: [[-115, '#ff5e5e'], [-105, '#ff9f43'], [-95, '#ffd23f'], [-85, '#a8e05f'], [-75, '#3ddc84']] },
+  sinr: { stops: [[-6, '#ff5e5e'], [-1.5, '#ff9f43'], [6.5, '#ffd23f'], [16.5, '#a8e05f'], [23, '#3ddc84']] },
+  tput: { stops: [[0.02, '#ff5e5e'], [0.15, '#ff9f43'], [0.35, '#ffd23f'], [0.6, '#a8e05f'], [0.85, '#3ddc84']] }
+};
+const LEVELS = {
+  rsrp: [['很好', '≥ −80 dBm', '#3ddc84'], ['好', '−80 至 −90', '#a8e05f'], ['普通', '−90 至 −100', '#ffd23f'], ['弱', '−100 至 −110', '#ff9f43'], ['很差', '< −110', '#ff5e5e']],
+  sinr: [['很好', '≥ 20 dB', '#3ddc84'], ['好', '13 至 20', '#a8e05f'], ['普通', '0 至 13', '#ffd23f'], ['弱', '−3 至 0', '#ff9f43'], ['很差', '< −3', '#ff5e5e']]
+};
+const hex3 = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function rampRGB(S, v) {
+  if (v <= S[0][0]) return hex3(S[0][1]);
+  for (let k = 1; k < S.length; k++) if (v <= S[k][0]) {
+    const a = hex3(S[k - 1][1]), b = hex3(S[k][1]), t = (v - S[k - 1][0]) / (S[k][0] - S[k - 1][0]);
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  }
+  return hex3(S[S.length - 1][1]);
+}
+
+/* ---- state ---- */
+const DEF_CFG = { band: 'n79', f: 4850, bw: 100, scs: 30, nf: 7, ueH: 1.5, n: 2, extra: 0, load: 100, layers: 2, dl: 74 };
+const newProj = name => ({ id: uid(), name, mpp: 0.05, scaleSet: false, w: 800, h: 480, objs: [], rus: [], pts: [], area: null, cfg: { ...DEF_CFG }, matOv: {}, demo: false });
+let P = null, IMG = null;                 // current project, its floor-plan image element
+const st = { tool: 'sel', mat: { wall: 'conc', door: 'metal', rect: 'elev' }, pend: null, hover: null, sel: null, probe: null, metric: 'rsrp',
+  view: { ox: 0, oy: 0, z: 1 }, heat: null, undo: [], planA: 1, heatA: 0.62 };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(LS + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(LS + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del(k) { try { localStorage.removeItem(LS + k); } catch (e) {} }
+};
+let saveT = 0;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { if (!store.set('p:' + P.id, P)) toast('瀏覽器存不下這個專案，請用「匯出專案檔」備份。'); const ix = store.get('index', []).filter(x => x.id !== P.id); ix.push({ id: P.id, name: P.name }); store.set('index', ix); store.set('last', P.id); }, 300); }
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 4200); }
+function sheet(title, html, mount) {
+  $('#sheetBox').innerHTML = `<div class="hd"><b>${esc(title)}</b><button type="button" id="shX">✕ 關閉</button></div>${html}`;
+  $('#sheet').hidden = false; $('#shX').onclick = closeSheet; if (mount) mount($('#sheetBox'));
+}
+function closeSheet() { $('#sheet').hidden = true; $('#sheetBox').innerHTML = ''; }
+$('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+function confirmSheet(title, msg, okLabel, fn) {
+  sheet(title, `<p>${esc(msg)}</p><div class="btns"><button type="button" id="shNo">取消</button><button type="button" class="primary" id="shOk">${esc(okLabel)}</button></div>`,
+    () => { $('#shNo').onclick = closeSheet; $('#shOk').onclick = () => { closeSheet(); fn(); }; });
+}
+function pushUndo() { st.undo.push(JSON.stringify({ objs: P.objs, rus: P.rus, pts: P.pts, area: P.area, mpp: P.mpp, scaleSet: P.scaleSet })); if (st.undo.length > 60) st.undo.shift(); $('#undo').disabled = false; }
+$('#undo').onclick = () => { const s = st.undo.pop(); if (!s) return; Object.assign(P, JSON.parse(s)); st.sel = null; st.pend = null; st.probe = null; $('#undo').disabled = !st.undo.length; changed(); };
+
+/* ---- demo floor: a 32 × 18 m office floor, coordinates in metres ---- */
+function demoProj() {
+  const p = newProj('示範：辦公樓層 32 × 18 m'); p.demo = true; p.scaleSet = true; p.mpp = 0.05; p.w = 800; p.h = 480;
+  const u = v => v / p.mpp, o = (k, m, a, b, c, d, x) => p.objs.push({ id: uid(), k, m, x1: u(a), y1: u(b), x2: u(c), y2: u(d), ...x });
+  [[4, 3, 36, 3], [36, 3, 36, 21], [36, 21, 4, 21], [4, 21, 4, 3]].forEach(s => o('wall', 'conc', ...s));          // outer RC walls
+  o('wall', 'thick', 4, 10.5, 8, 10.5); o('wall', 'thick', 8, 10.5, 8, 13.5);                                      // stair core
+  o('door', 'metal', 8, 11.5, 8, 12.5);                                                                             // fire door of the stair core
+  o('wall', 'dry', 8, 10.5, 20, 10.5); o('wall', 'glass', 20, 10.5, 28, 10.5); o('wall', 'dry', 28, 10.5, 36, 10.5); // north corridor wall
+  o('wall', 'dry', 12, 3, 12, 10.5); o('wall', 'dry', 20, 3, 20, 10.5); o('wall', 'dry', 28, 3, 28, 10.5);
+  o('wall', 'brick', 4, 13.5, 8.5, 13.5); o('wall', 'brick', 10.5, 13.5, 36, 13.5);                                 // south corridor wall
+  o('wall', 'brick', 16, 13.5, 16, 21); o('wall', 'brick', 26, 13.5, 26, 21);
+  o('rect', 'elev', 8.5, 13.5, 10.5, 15.7);
+  [[9.5, 10.5, 10.5, 10.5], [15, 10.5, 16, 10.5], [30, 10.5, 31, 10.5]].forEach(s => o('door', 'wood', ...s));
+  o('door', 'glass', 23, 10.5, 24.2, 10.5);
+  [[12.5, 13.5, 13.5, 13.5], [20, 13.5, 21, 13.5], [29, 13.5, 30, 13.5]].forEach(s => o('door', 'wood', ...s));
+  o('door', 'shut', 36, 11, 36, 13);
+  p.rus.push({ id: uid(), name: 'RU-1', x: u(14), y: u(12), cell: 1, on: true, p: 24, g: 4, dir: false, az: 0, bw: 90, h: 2.8 });
+  p.rus.push({ id: uid(), name: 'RU-2', x: u(29.5), y: u(12), cell: 1, on: true, p: 24, g: 4, dir: false, az: 0, bw: 90, h: 2.8 });
+  [[6, 12], [9.5, 14.8], [24, 6.5], [21, 17.5], [33, 18]].forEach(([x, y]) => p.pts.push({ id: uid(), x: u(x), y: u(y), meas: null }));
+  return p;
+}
+
+/* ---- projects ---- */
+function loadProj(id) {
+  let p = id && store.get('p:' + id, null);
+  if (!p) { p = demoProj(); }
+  P = p; P.cfg = { ...DEF_CFG, ...P.cfg }; P.matOv = P.matOv || {}; P.pts = P.pts || []; P.rus = P.rus || []; P.objs = P.objs || [];
+  IMG = null; st.undo = []; st.sel = null; st.pend = null; st.probe = null; $('#undo').disabled = true;
+  const d = store.get('img:' + P.id, null);
+  if (d) { const im = new Image(); im.onload = () => { IMG = im; draw(); }; im.src = d; }
+  store.set('last', P.id); cfgToUI(); fit(); changed(true);
+}
+function projList() {
+  const ix = store.get('index', []); if (!ix.some(x => x.id === P.id)) ix.push({ id: P.id, name: P.name });
+  $('#projSel').innerHTML = ix.map(x => `<option value="${x.id}"${x.id === P.id ? ' selected' : ''}>${esc(x.id === P.id ? P.name : x.name)}</option>`).join('');
+}
+$('#projSel').onchange = e => loadProj(e.target.value);
+function askName(title, val, fn) {
+  sheet(title, `<input type="text" id="shName" value="${esc(val)}" maxlength="40"><div class="btns"><button type="button" class="primary" id="shOk">確定</button></div>`,
+    () => { const i = $('#shName'); i.focus(); i.select(); const go = () => { const v = i.value.trim(); if (!v) return; closeSheet(); fn(v); }; $('#shOk').onclick = go; i.onkeydown = e => { if (e.key === 'Enter') go(); }; });
+}
+$('#pNew').onclick = () => askName('新平面的名稱', '未命名樓層', v => { const p = newProj(v); store.set('p:' + p.id, p); loadProj(p.id); save(); toast('已建立空白平面。到「平面圖」上傳底圖，或直接開始畫牆。'); });
+$('#pName').onclick = () => askName('改名', P.name, v => { P.name = v; P.demo = false; changed(true); });
+$('#pDemo').onclick = () => { const p = demoProj(); store.set('p:' + p.id, p); loadProj(p.id); save(); };
+$('#pDel').onclick = () => confirmSheet('刪除這個平面？', `「${P.name}」的底圖、牆面、RU 和測點都會從這台裝置移除，無法復原。`, '刪除', () => {
+  store.del('p:' + P.id); store.del('img:' + P.id); const ix = store.get('index', []).filter(x => x.id !== P.id); store.set('index', ix); clearTimeout(saveT);
+  loadProj(ix.length ? ix[ix.length - 1].id : null); save();
+});
+
+/* ---- floor-plan image ---- */
+$('#upPlan').onclick = () => $('#fPlan').click();
+$('#fPlan').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    let src;   // a canvas or image to downscale
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) src = await pdfPage(f);
+    else src = await new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => no(new Error('img')); im.src = URL.createObjectURL(f); });
+    const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height, k = Math.min(1, 2000 / Math.max(sw, sh));
+    const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+    const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height);
+    const data = c.toDataURL('image/jpeg', 0.85);
+    const hadGeom = P.objs.length || P.rus.length;
+    pushUndo();
+    if (!hadGeom) { P.w = c.width; P.h = c.height; P.scaleSet = false; P.area = null; }
+    else P.h = P.w * c.height / c.width;       // keep existing drawings: the new image spans the same plan width
+    P.demo = false;
+    if (!store.set('img:' + P.id, data)) toast('底圖太大，瀏覽器存不下；這次可以用，重新整理後要再上傳。');
+    const im = new Image(); im.onload = () => { IMG = im; fit(); changed(true); }; im.src = data;
+    toast(hadGeom ? '已換底圖，原本畫的牆和 RU 保留。' : '底圖已載入。下一步：設定比例尺。');
+  } catch (err) { toast(f.type === 'application/pdf' ? '這個 PDF 讀不出來。請改傳平面圖的截圖或圖片。' : '這個檔案不是可讀的圖片。請改傳 PNG、JPG 或 PDF。'); }
+};
+async function pdfPage(file) {
+  if (!window.pdfjsLib) await new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, pg = await doc.getPage(1);
+  const v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: Math.min(4, 2000 / Math.max(v0.width, v0.height)) });
+  const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+  await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+  return c;
+}
+$('#rmPlan').onclick = () => { if (!IMG) return; IMG = null; store.del('img:' + P.id); changed(true); };
+$('#planA').oninput = e => { st.planA = e.target.value / 100; draw(); };
+$('#heatA').oninput = e => { st.heatA = e.target.value / 100; draw(); };
+
+/* ---- canvas, view ---- */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let CW = 0, CH = 0, DPR = 1;
+function resize() { const r = $('#stage').getBoundingClientRect(); DPR = Math.min(window.devicePixelRatio || 1, 2); CW = r.width; CH = r.height; cv.width = Math.round(CW * DPR); cv.height = Math.round(CH * DPR); if (P && !st.userView) fit(); else draw(); }
+new ResizeObserver(resize).observe($('#stage'));
+const sx = u => (u - st.view.ox) * st.view.z, sy = u => (u - st.view.oy) * st.view.z;
+const ux = s => s / st.view.z + st.view.ox, uy = s => s / st.view.z + st.view.oy;
+function bounds() {   // plan-unit box of everything drawn, or the plan itself
+  let a = 0, b = 0, c = P.w, d = P.h;
+  P.objs.forEach(o => { a = Math.min(a, o.x1, o.x2); b = Math.min(b, o.y1, o.y2); c = Math.max(c, o.x1, o.x2); d = Math.max(d, o.y1, o.y2); });
+  return [a, b, c, d];
+}
+function fit() {
+  const [a, b, c, d] = bounds(), w = CW || 800, h = CH || 600, padT = 110, pad = 24;
+  const z = Math.min((w - 2 * pad) / (c - a), (h - padT - pad - 44) / (d - b));
+  st.userView = false; st.view.z = Math.max(z, 0.01); st.view.ox = a - (w / st.view.z - (c - a)) / 2; st.view.oy = b - (padT / st.view.z) - ((h - padT - 44) / st.view.z - (d - b)) / 2;
+  draw();
+}
+function zoomAt(px, py, k) { st.userView = true; const v = st.view, wx = ux(px), wy = uy(py); v.z = Math.max(0.02, Math.min(60, v.z * k)); v.ox = wx - px / v.z; v.oy = wy - py / v.z; draw(); }
+$('#zin').onclick = () => zoomAt(CW / 2, CH / 2, 1.4); $('#zout').onclick = () => zoomAt(CW / 2, CH / 2, 1 / 1.4); $('#zfit').onclick = fit;
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015)); }, { passive: false });
+
+/* ---- model plumbing ---- */
+const fGHz = () => P.cfg.f / 1000;
+const activeRUs = () => P.rus.filter(r => r.on).map(r => ({ ...r, x: r.x * P.mpp, y: r.y * P.mpp }));
+const curModel = () => ({ m: IN.model(P.cfg), S: IN.build(P.objs, P.mpp, fGHz(), P.matOv), rus: activeRUs() });
+function evalU(M, x, y) { return IN.evalAt(M.m, M.S, M.rus, x * P.mpp, y * P.mpp); }
+function areaBox() {
+  if (P.area) return [Math.min(P.area.x1, P.area.x2), Math.min(P.area.y1, P.area.y2), Math.max(P.area.x1, P.area.x2), Math.max(P.area.y1, P.area.y2)];
+  if (!P.objs.length) return [0, 0, P.w, P.h];
+  let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+  P.objs.forEach(o => { a = Math.min(a, o.x1, o.x2); b = Math.min(b, o.y1, o.y2); c = Math.max(c, o.x1, o.x2); d = Math.max(d, o.y1, o.y2); });
+  return [a, b, c, d];
+}
+let compTok = 0, compT = 0;
+function recompute() { clearTimeout(compT); compT = setTimeout(compute, 120); }
+function compute() {
+  const tok = ++compTok, M = curModel();
+  if (!M.rus.length) { st.heat = null; $('#busy').hidden = true; afterCompute(M); return; }
+  const [a, b, c, d] = areaBox(), mpp = P.mpp, wm = (c - a) * mpp, hm = (d - b) * mpp;
+  const maxCells = window.matchMedia('(max-width:699px)').matches ? 14000 : 30000;
+  const step = Math.max(0.1, Math.sqrt(wm * hm / maxCells)), nx = Math.max(1, Math.ceil(wm / step)), ny = Math.max(1, Math.ceil(hm / step));
+  const H = { a, b, c, d, nx, ny, step, rsrp: new Float32Array(nx * ny), sinr: new Float32Array(nx * ny), tput: new Float32Array(nx * ny), ru: new Int8Array(nx * ny), peak: M.m.peak, ids: M.rus.map(r => r.id) };
+  let j = 0; $('#busy').hidden = false;
+  (function slice() {
+    if (tok !== compTok) return;
+    const t0 = performance.now();
+    for (; j < ny && performance.now() - t0 < 24; j++) for (let i = 0; i < nx; i++) {
+      const r = IN.evalAt(M.m, M.S, M.rus, a * mpp + (i + 0.5) * step, b * mpp + (j + 0.5) * step), k = j * nx + i;
+      H.rsrp[k] = r.rsrp; H.sinr[k] = r.sinr; H.tput[k] = r.tput; H.ru[k] = r.ru;
+    }
+    if (j < ny) { setTimeout(slice, 0); return; }
+    st.heat = H; $('#busy').hidden = true; paintHeat(); afterCompute(M);
+  })();
+}
+function paintHeat() {
+  const H = st.heat; if (!H) return;
+  const c = H.cv || (H.cv = document.createElement('canvas')); c.width = H.nx; c.height = H.ny;
+  const g = c.getContext('2d'), im = g.createImageData(H.nx, H.ny), d = im.data, mt = st.metric;
+  for (let k = 0; k < H.nx * H.ny; k++) {
+    const col = mt === 'srv' ? hex3(RU_COL[ruColIdx(H.ids[H.ru[k]]) % RU_COL.length]) : rampRGB(RAMP[mt].stops, mt === 'tput' ? H.tput[k] / (H.peak || 1) : H[mt][k]);
+    d[4 * k] = col[0]; d[4 * k + 1] = col[1]; d[4 * k + 2] = col[2]; d[4 * k + 3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+}
+const ruColIdx = id => Math.max(0, P.rus.findIndex(r => r.id === id));
+const median = arr => { const s = Float32Array.from(arr).sort(); return s.length ? s[s.length >> 1] : NaN; };
+function afterCompute(M) {
+  const H = st.heat;
+  if (!H) {
+    $('#tiles').innerHTML = ''; $('#gridInfo').textContent = P.rus.length ? '所有 RU 都關閉了。打開至少一個才會有熱圖。' : '還沒有 RU。用上方「RU」工具在圖上點一個位置。';
+    $('#sum').innerHTML = P.rus.length ? '所有 RU 都關閉' : '還沒有 RU：選「RU」工具後在圖上點位置';
+  } else {
+    const n = H.nx * H.ny; let c100 = 0, c90 = 0, tp = 0;
+    for (let k = 0; k < n; k++) { if (H.rsrp[k] >= -100) c100++; if (H.rsrp[k] >= -90) c90++; tp += H.tput[k]; }
+    const mR = median(H.rsrp), mS = median(H.sinr), p5 = Float32Array.from(H.tput).sort()[Math.floor(n * 0.05)];
+    $('#tiles').innerHTML = `<div class="tile"><dt>覆蓋率（RSRP ≥ −100 dBm）</dt><dd>${fmt(100 * c100 / n)}<small>%</small></dd></div>` +
+      `<div class="tile"><dt>RSRP ≥ −90 dBm 的面積</dt><dd>${fmt(100 * c90 / n)}<small>%</small></dd></div>` +
+      `<div class="tile"><dt>RSRP 中位數</dt><dd>${fmt(mR)}<small>dBm</small></dd></div><div class="tile"><dt>SINR 中位數</dt><dd>${fmt(mS)}<small>dB</small></dd></div>` +
+      `<div class="tile"><dt>平均下行速率</dt><dd>${fmt(tp / n)}<small>Mbps</small></dd></div><div class="tile"><dt>最差 5% 的下行速率</dt><dd>${fmt(p5)}<small>Mbps</small></dd></div>`;
+    $('#gridInfo').innerHTML = `範圍 <b>${fmt((H.c - H.a) * P.mpp, 1)} × ${fmt((H.d - H.b) * P.mpp, 1)} m</b>，格點 ${n.toLocaleString()} 個、間距 ${fmt(H.step, 2)} m。${M.m.nrb} RB，速率上限 ${fmt(H.peak)} Mbps（${M.m.layers} 層）。` + (P.scaleSet ? '' : '<br><span class="warn">比例尺還沒設定，距離和結果都只是示意。</span>');
+    $('#sum').innerHTML = `覆蓋率 <b>${fmt(100 * c100 / n)}%</b> · SINR 中位 <b>${fmt(mS)} dB</b> · 平均 <b>${fmt(tp / n)} Mbps</b>` + (P.scaleSet ? '' : ' · <span class="warn">未設比例尺</span>');
+  }
+  soft($('#ptTbl'), () => renderPts(M)); renderCal(M); if (st.probe) st.probe.r = M.rus.length ? probeAt(M, st.probe.x, st.probe.y) : null; soft($('#selbar'), renderSel); draw();
+}
+
+/* ---- drawing ---- */
+function draw(g = ctx, V = st.view, W = CW, Hh = CH, exp = false) {
+  if (!P) return;
+  const X = u => (u - V.ox) * V.z, Y = u => (u - V.oy) * V.z;
+  if (!exp) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, Hh); }
+  g.fillStyle = exp ? '#ffffff' : '#0b0f14'; g.fillRect(0, 0, W, Hh);
+  // paper + metre grid, or the plan image
+  g.fillStyle = '#f3f1ec'; g.fillRect(X(0), Y(0), P.w * V.z, P.h * V.z);
+  if (IMG) { g.globalAlpha = exp ? 1 : st.planA; g.drawImage(IMG, X(0), Y(0), P.w * V.z, P.h * V.z); g.globalAlpha = 1; }
+  else {
+    const m = 1 / P.mpp, big = m * V.z < 6 ? 5 : 1; g.lineWidth = 1;
+    for (let k = 0, x = 0; x <= P.w + 1e-6; x += m * big, k += big) { g.strokeStyle = k % 5 ? '#e2ded4' : '#cfcabd'; g.beginPath(); g.moveTo(X(x), Y(0)); g.lineTo(X(x), Y(P.h)); g.stroke(); }
+    for (let k = 0, y = 0; y <= P.h + 1e-6; y += m * big, k += big) { g.strokeStyle = k % 5 ? '#e2ded4' : '#cfcabd'; g.beginPath(); g.moveTo(X(0), Y(y)); g.lineTo(X(P.w), Y(y)); g.stroke(); }
+  }
+  const H = st.heat;
+  if (H && H.cv && st.heatA > 0) { g.save(); g.globalAlpha = st.heatA; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(H.cv, X(H.a), Y(H.b), (H.c - H.a) * V.z, (H.d - H.b) * V.z); g.restore(); }
+  if (P.area) { const [a, b, c, d] = areaBox(); g.setLineDash([6, 4]); g.strokeStyle = '#10151b'; g.lineWidth = 1.5; g.strokeRect(X(a), Y(b), (c - a) * V.z, (d - b) * V.z); g.setLineDash([]); }
+  // walls, rects, doors
+  const line = (o, w, col) => { g.lineWidth = w; g.strokeStyle = col; g.beginPath(); if (o.k === 'rect') g.rect(X(o.x1), Y(o.y1), (o.x2 - o.x1) * V.z, (o.y2 - o.y1) * V.z); else { g.moveTo(X(o.x1), Y(o.y1)); g.lineTo(X(o.x2), Y(o.y2)); } g.stroke(); };
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const order = P.objs.filter(o => o.k !== 'door').concat(P.objs.filter(o => o.k === 'door'));
+  order.forEach(o => {
+    const col = IN.MATS[o.m].c, cur = st.sel && st.sel.t === 'obj' && st.sel.id === o.id, w = o.k === 'door' ? 7 : 4;
+    if (o.k === 'rect') { g.fillStyle = col + '55'; g.fillRect(X(o.x1), Y(o.y1), (o.x2 - o.x1) * V.z, (o.y2 - o.y1) * V.z); }
+    line(o, w + (cur ? 6 : 3), cur ? '#ffffff' : '#10151b');
+    if (o.k === 'door' && o.open) g.setLineDash([3, 7]);
+    line(o, w, col); g.setLineDash([]);
+    if (o.k === 'rect' && o.m === 'elev' && Math.abs(o.x2 - o.x1) * V.z > 34) { g.fillStyle = '#10151b'; g.font = '600 11px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('電梯', X((o.x1 + o.x2) / 2), Y((o.y1 + o.y2) / 2)); }
+    if (cur && !exp) [[o.x1, o.y1], [o.x2, o.y2]].forEach(([x, y]) => { g.fillStyle = '#fff'; g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.arc(X(x), Y(y), 7, 0, 7); g.fill(); g.stroke(); });
+  });
+  // test points
+  P.pts.forEach((p, i) => {
+    const cur = st.sel && st.sel.t === 'pt' && st.sel.id === p.id;
+    g.fillStyle = '#10151b'; g.strokeStyle = cur ? '#ffb347' : '#fff'; g.lineWidth = cur ? 3 : 2; g.beginPath(); g.arc(X(p.x), Y(p.y), 9, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.font = '600 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, X(p.x), Y(p.y) + 0.5);
+  });
+  // probe ray
+  if (st.probe && st.probe.r && !exp) {
+    const ru = P.rus.find(r => r.id === st.probe.r.ruId);
+    if (ru) { g.strokeStyle = '#10151b'; g.lineWidth = 1.5; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(X(ru.x), Y(ru.y)); g.lineTo(X(st.probe.x), Y(st.probe.y)); g.stroke(); g.setLineDash([]); }
+    g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(st.probe.x) - 8, Y(st.probe.y)); g.lineTo(X(st.probe.x) + 8, Y(st.probe.y)); g.moveTo(X(st.probe.x), Y(st.probe.y) - 8); g.lineTo(X(st.probe.x), Y(st.probe.y) + 8); g.stroke();
+  }
+  // RUs
+  P.rus.forEach((r, i) => {
+    const col = RU_COL[i % RU_COL.length], cur = st.sel && st.sel.t === 'ru' && st.sel.id === r.id, x = X(r.x), y = Y(r.y);
+    if (r.dir) { const a = (r.az - 90) * Math.PI / 180, hw = (r.bw || 65) / 2 * Math.PI / 180; g.fillStyle = col + '66'; g.strokeStyle = '#10151b'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.arc(x, y, 34, a - hw, a + hw); g.closePath(); g.fill(); g.stroke(); }
+    g.globalAlpha = r.on ? 1 : 0.45; g.fillStyle = col; g.strokeStyle = cur ? '#fff' : '#10151b'; g.lineWidth = cur ? 4 : 2.5; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1;
+    g.font = '600 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.lineWidth = 3; g.strokeStyle = '#fff'; g.strokeText(r.name, x, y - 13); g.fillStyle = '#10151b'; g.fillText(r.name, x, y - 13);
+  });
+  if (exp) return;
+  // in-progress segment / rectangle
+  if (st.pend) {
+    const p = st.pend, h = st.hover; g.fillStyle = '#ffb347'; g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.arc(X(p.x), Y(p.y), 6, 0, 7); g.fill(); g.stroke();
+    if (h) {
+      g.strokeStyle = '#ffb347'; g.lineWidth = 2; g.setLineDash([6, 4]); g.beginPath();
+      if (st.tool === 'rect' || st.tool === 'area') g.rect(X(p.x), Y(p.y), (h.x - p.x) * V.z, (h.y - p.y) * V.z); else { g.moveTo(X(p.x), Y(p.y)); g.lineTo(X(h.x), Y(h.y)); }
+      g.stroke(); g.setLineDash([]);
+      const L = Math.hypot(h.x - p.x, h.y - p.y) * P.mpp; g.font = '600 12px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.lineWidth = 3; g.strokeStyle = '#10151b'; g.strokeText(fmt(L, 2) + ' m', X(h.x) + 10, Y(h.y) - 8); g.fillStyle = '#ffb347'; g.fillText(fmt(L, 2) + ' m', X(h.x) + 10, Y(h.y) - 8);
+    }
+  }
+  // scale bar
+  const target = 100 / V.z * P.mpp, nice = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2].find(v => v <= target) || 0.1, bl = nice / P.mpp * V.z, bx = 12, by = Hh - 16;
+  g.strokeStyle = '#e4e9ee'; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by - 5); g.lineTo(bx, by); g.lineTo(bx + bl, by); g.lineTo(bx + bl, by - 5); g.stroke();
+  g.fillStyle = '#e4e9ee'; g.font = '11px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(nice + ' m' + (P.scaleSet ? '' : '（未校正）'), bx + 4, by - 3);
+}
+
+/* ---- snapping and hit tests (all in plan units) ---- */
+const tol = px => px / st.view.z;
+function nearestOnSeg(x, y, a, b, c, d) { const vx = c - a, vy = d - b, L2 = vx * vx + vy * vy || 1e-9, t = Math.max(0, Math.min(1, ((x - a) * vx + (y - b) * vy) / L2)); return { x: a + t * vx, y: b + t * vy, t }; }
+function segsOf(o) { return o.k === 'rect' ? [[o.x1, o.y1, o.x2, o.y1], [o.x2, o.y1, o.x2, o.y2], [o.x2, o.y2, o.x1, o.y2], [o.x1, o.y2, o.x1, o.y1]] : [[o.x1, o.y1, o.x2, o.y2]]; }
+function snap(x, y, mode) {
+  // 1. existing end points  2. onto a wall (doors always, walls for T-junctions)  3. horizontal / vertical from the pending point
+  let best = null, bd = tol(14);
+  if (mode !== 'door') P.objs.forEach(o => segsOf(o).forEach(s => [[s[0], s[1]], [s[2], s[3]]].forEach(([a, b]) => { const d = Math.hypot(a - x, b - y); if (d < bd) { bd = d; best = { x: a, y: b }; } })));
+  if (best) return best;
+  bd = tol(mode === 'door' ? 22 : 9);
+  P.objs.forEach(o => { if (o.k === 'door') return; segsOf(o).forEach(s => { const n = nearestOnSeg(x, y, ...s), d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = { x: n.x, y: n.y, on: s }; } }); });
+  if (best) return best;
+  if (st.pend && mode !== 'free') { const dx = Math.abs(x - st.pend.x), dy = Math.abs(y - st.pend.y); if (dy < dx * 0.09) return { x, y: st.pend.y }; if (dx < dy * 0.09) return { x: st.pend.x, y }; }
+  return { x, y };
+}
+function hit(x, y) {
+  const t = tol(16);
+  for (let i = P.rus.length - 1; i >= 0; i--) if (Math.hypot(P.rus[i].x - x, P.rus[i].y - y) < t) return { t: 'ru', id: P.rus[i].id };
+  for (let i = P.pts.length - 1; i >= 0; i--) if (Math.hypot(P.pts[i].x - x, P.pts[i].y - y) < t) return { t: 'pt', id: P.pts[i].id };
+  let best = null, bd = tol(13);
+  P.objs.forEach(o => segsOf(o).forEach(s => { const n = nearestOnSeg(x, y, ...s), d = Math.hypot(n.x - x, n.y - y) - (o.k === 'door' ? tol(3) : 0); if (d < bd) { bd = d; best = { t: 'obj', id: o.id }; } }));
+  return best;
+}
+const selObj = () => st.sel && st.sel.t === 'obj' ? P.objs.find(o => o.id === st.sel.id) : null;
+function hitHandle(x, y) { const o = selObj(); if (!o) return null; const t = tol(18); if (Math.hypot(o.x1 - x, o.y1 - y) < t) return 1; if (Math.hypot(o.x2 - x, o.y2 - y) < t) return 2; return null; }
+
+/* ---- pointer input: tap = act, one-finger drag = move the thing under the finger or pan, two fingers = pinch zoom ---- */
+const ptrs = new Map(); let G = null, lockTap = false;
+const pos = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId); const p = pos(e); ptrs.set(e.pointerId, p);
+  if (ptrs.size === 1) {
+    G = { sx: p.x, sy: p.y, lx: p.x, ly: p.y, moved: false, drag: null, touch: e.pointerType !== 'mouse' };
+    if (st.tool === 'sel') { const x = ux(p.x), y = uy(p.y), h = hitHandle(x, y); if (h) G.drag = { t: 'h', end: h }; else { const o = hit(x, y); if (o && (o.t === 'ru' || o.t === 'pt')) G.drag = o; } }
+  } else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()]; G = { pinch: true, d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: st.view.z, wx: ux((a.x + b.x) / 2), wy: uy((a.y + b.y) / 2) }; lockTap = true;
+  }
+});
+cv.addEventListener('pointermove', e => {
+  const p = pos(e);
+  if (!ptrs.has(e.pointerId)) { if (st.pend) { st.hover = snap(ux(p.x), uy(p.y), st.tool === 'door' ? 'door' : st.tool === 'wall' ? 'wall' : 'free'); draw(); } return; }
+  ptrs.set(e.pointerId, p);
+  if (G && G.pinch && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1, cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, v = st.view;
+    st.userView = true; v.z = Math.max(0.02, Math.min(60, G.z0 * d / G.d0)); v.ox = G.wx - cx / v.z; v.oy = G.wy - cy / v.z; draw(); return;
+  }
+  if (!G || G.pinch) return;
+  if (!G.moved && Math.hypot(p.x - G.sx, p.y - G.sy) > (G.touch ? 9 : 4)) { G.moved = true; if (G.drag) pushUndo(); }
+  if (!G.moved) return;
+  if (G.drag) {
+    const x = ux(p.x), y = uy(p.y);
+    if (G.drag.t === 'h') { const o = selObj(), s = o.k === 'rect' ? { x, y } : snapEnd(o, G.drag.end, x, y); if (G.drag.end === 1) { o.x1 = s.x; o.y1 = s.y; } else { o.x2 = s.x; o.y2 = s.y; } }
+    else { const it = (G.drag.t === 'ru' ? P.rus : P.pts).find(r => r.id === G.drag.id); it.x = x; it.y = y; st.sel = G.drag; }
+    draw();
+  } else { st.userView = true; st.view.ox -= (p.x - G.lx) / st.view.z; st.view.oy -= (p.y - G.ly) / st.view.z; draw(); }
+  G.lx = p.x; G.ly = p.y;
+});
+function snapEnd(o, end, x, y) {   // dragging one end: snap to other objects' ends/walls, and keep horizontal/vertical to the fixed end
+  const keep = st.pend; st.pend = end === 1 ? { x: o.x2, y: o.y2 } : { x: o.x1, y: o.y1 };
+  const others = P.objs; P.objs = others.filter(q => q !== o); const s = snap(x, y, o.k === 'door' ? 'door' : 'wall'); P.objs = others; st.pend = keep; return s;
+}
+function up(e) {
+  const p = ptrs.get(e.pointerId); ptrs.delete(e.pointerId); if (!p) return;
+  if (ptrs.size === 0) {
+    const g = G; G = null;
+    if (lockTap) { lockTap = false; return; }
+    if (!g || g.pinch) return;
+    if (!g.moved) tap(ux(p.x), uy(p.y)); else if (g.drag) changed();
+  }
+}
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); if (!ptrs.size) { G = null; lockTap = false; } });
+
+function tap(x, y) {
+  const T = st.tool;
+  if (T === 'sel') {
+    const h = hit(x, y); st.probe = null;
+    if (h) st.sel = h; else { st.sel = null; const M = curModel(); if (M.rus.length) st.probe = { x, y, r: probeAt(M, x, y) }; }
+    renderSel(); renderRUs(); draw(); return;
+  }
+  if (T === 'ru') { pushUndo(); const n = P.rus.length + 1, last = P.rus[P.rus.length - 1]; const r = { id: uid(), name: 'RU-' + n, x, y, cell: last ? last.cell : 1, on: true, p: last ? last.p : 24, g: last ? last.g : 4, dir: false, az: 0, bw: 90, h: last ? last.h : 2.8 }; P.rus.push(r); st.sel = { t: 'ru', id: r.id }; changed(); return; }
+  if (T === 'pt') { pushUndo(); const q = { id: uid(), x, y, meas: null }; P.pts.push(q); st.sel = { t: 'pt', id: q.id }; changed(); return; }
+  const s = snap(x, y, T === 'door' ? 'door' : T === 'wall' ? 'wall' : 'free');
+  if (!st.pend) { st.pend = s; st.hover = null; ui(); draw(); return; }
+  const a = st.pend, len = Math.hypot(s.x - a.x, s.y - a.y);
+  if (len < tol(8)) { st.pend = null; st.hover = null; ui(); draw(); return; }      // tapping the same spot ends the chain
+  if (T === 'scale') { st.pend = null; st.hover = null; askScale(len); return; }
+  pushUndo();
+  if (T === 'area') { P.area = { x1: a.x, y1: a.y, x2: s.x, y2: s.y }; st.pend = null; setTool('sel'); changed(); return; }
+  const o = { id: uid(), k: T, m: st.mat[T], x1: a.x, y1: a.y, x2: s.x, y2: s.y };
+  if (o.m === 'cust') o.cust = 10;
+  P.objs.push(o); st.pend = T === 'wall' ? s : null; st.hover = null; changed();
+}
+function probeAt(M, x, y) {
+  const r = evalU(M, x, y); if (!r) return null;
+  const ru = M.rus[r.ru], hits = []; IN.ruRsrp(M.m, M.S, ru, x * P.mpp, y * P.mpp, hits);
+  const cnt = {}; let tot = 0; hits.forEach(i => { const o = P.objs[i], L = IN.objLoss(o, fGHz(), P.matOv), nm = (o.m === 'cust' ? '自訂' : IN.MATS[o.m].n.replace(/（.*/, '')) + (o.k === 'door' ? (o.open ? '（門開）' : '（門）') : ''); cnt[nm] = (cnt[nm] || 0) + 1; tot += L; });
+  return { ...r, ruId: ru.id, ruName: ru.name, d: Math.hypot(x * P.mpp - ru.x, y * P.mpp - ru.y), walls: Object.entries(cnt).map(([k, v]) => `${k}×${v}`).join('、'), wl: tot };
+}
+
+/* ---- tools and material chips ---- */
+const HINTS = { sel: '點物件修改，點空白處看預測值；拖曳移動，兩指縮放。', wall: '點一下定起點，再點下一個轉角；牆會一段接一段，按「完成」結束。', door: '在牆上點門的兩側。門會取代那一段牆的損耗。',
+  rect: '點電梯的兩個對角。', ru: '在圖上點 RU 的位置。', pt: '在圖上點要比對的位置。', scale: '點圖上已知距離的兩端，例如一道牆的兩個角。', area: '點評估範圍的兩個對角。' };
+function setTool(t) { st.tool = t; st.pend = null; st.hover = null; if (t !== 'sel') { st.sel = null; st.probe = null; } ui(); renderSel(); draw(); }
+$('#toolbar').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTool(b.dataset.tool); });
+$('#done').onclick = () => { st.pend = null; st.hover = null; ui(); draw(); };
+function ui() {
+  $$('#toolbar button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === st.tool));
+  cv.classList.toggle('sel', st.tool === 'sel');
+  $('#done').hidden = !(st.tool === 'wall' && st.pend);
+  const use = { wall: 'w', door: 'd', rect: 'r' }[st.tool], mats = $('#mats');
+  mats.hidden = !use;
+  if (use) mats.innerHTML = Object.entries(IN.MATS).filter(([, m]) => m.use.includes(use)).map(([id, m]) => `<button type="button" data-m="${id}" aria-pressed="${st.mat[st.tool] === id}"><i style="background:${m.c}"></i>${esc(m.n.replace(/（.*/, ''))}<small>${id === 'cust' ? '' : fmt(IN.matLoss(id, fGHz(), P.matOv), 0) + ' dB'}</small></button>`).join('');
+  $('#hint').textContent = st.pend && st.tool === 'wall' ? '點下一個轉角；按「完成」結束這道牆。' : st.pend ? '再點另一端。' : HINTS[st.tool];
+  $('#hint').hidden = !$('#selbar').hidden;
+}
+$('#mats').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.mat[st.tool] = b.dataset.m; ui(); });
+
+/* ---- selection bar ---- */
+function renderSel() {
+  const bar = $('#selbar'); let h = '';
+  const s = st.sel;
+  if (s && s.t === 'obj') {
+    const o = selObj(); if (!o) { st.sel = null; return renderSel(); }
+    const use = { wall: 'w', door: 'd', rect: 'r' }[o.k], L = Math.hypot(o.x2 - o.x1, o.y2 - o.y1) * P.mpp;
+    h = `<span class="ttl">${{ wall: '牆', door: '門', rect: '電梯／箱體' }[o.k]}</span><select id="sbMat" aria-label="材質">${Object.entries(IN.MATS).filter(([, m]) => m.use.includes(use)).map(([id, m]) => `<option value="${id}"${o.m === id ? ' selected' : ''}>${esc(m.n)}${id === 'cust' ? '' : '　' + fmt(IN.matLoss(id, fGHz(), P.matOv), 1) + ' dB'}</option>`).join('')}</select>` +
+      (o.m === 'cust' ? `<label>損耗<input type="number" id="sbCust" value="${+o.cust || 0}" step="0.5">dB</label>` : '') +
+      (o.k === 'door' ? `<label><input type="checkbox" id="sbOpen"${o.open ? ' checked' : ''}>門開著</label>` : '') +
+      `<span class="foot">${o.k === 'rect' ? fmt(Math.abs(o.x2 - o.x1) * P.mpp, 2) + ' × ' + fmt(Math.abs(o.y2 - o.y1) * P.mpp, 2) : fmt(L, 2)} m</span><span class="sp"></span><button type="button" class="danger" id="sbDel">刪除</button>`;
+  } else if (s && s.t === 'ru') {
+    const r = P.rus.find(q => q.id === s.id); if (!r) { st.sel = null; return renderSel(); }
+    h = `<span class="ttl">${esc(r.name)}</span><label><input type="checkbox" id="sbOn"${r.on ? ' checked' : ''}>啟用</label><span class="foot">${r.p} dBm／埠 · ${r.g} dBi · ${r.dir ? '定向 ' + r.az + '°' : '全向'}</span><span class="sp"></span><button type="button" id="sbEdit">設定</button><button type="button" class="danger" id="sbDel">刪除</button>`;
+  } else if (s && s.t === 'pt') {
+    const i = P.pts.findIndex(q => q.id === s.id), q = P.pts[i]; if (!q) { st.sel = null; return renderSel(); }
+    const r = P.rus.some(u => u.on) ? evalU(curModel(), q.x, q.y) : null;
+    h = `<span class="ttl">測點 ${i + 1}</span><label>實測 RSRP<input type="number" id="sbMeas" value="${q.meas == null ? '' : q.meas}" step="1" placeholder="dBm"></label><span class="sp"></span><button type="button" class="danger" id="sbDel">刪除</button>` +
+      (r ? `<div class="txt">預測 RSRP <b>${fmt(r.rsrp, 1)} dBm</b> · SINR <b>${fmt(r.sinr, 1)} dB</b> · 下行 <b>${fmt(r.tput)} Mbps</b></div>` : '');
+  } else if (st.probe && st.probe.r) {
+    const r = st.probe.r;
+    h = `<span class="ttl">這一點</span><span class="sp"></span><button type="button" id="sbAdd">加為測點</button><button type="button" id="sbX">✕</button>` +
+      `<div class="txt">RSRP <b>${fmt(r.rsrp, 1)} dBm</b> · SINR <b>${fmt(r.sinr, 1)} dB</b> · 下行 <b>${fmt(r.tput)} Mbps</b><br>服務 ${esc(r.ruName)}，距離 ${fmt(r.d, 1)} m；${r.walls ? '穿過 ' + esc(r.walls) + '，共 ' + fmt(r.wl, 1) + ' dB' : '直視，沒有穿牆'}</div>`;
+  }
+  bar.innerHTML = h; bar.hidden = !h; $('#hint').hidden = !!h;
+  const on = (id, ev, fn) => { const el = $('#' + id); if (el) el.addEventListener(ev, fn); };
+  on('sbMat', 'change', e => { e.target.blur(); pushUndo(); const o = selObj(); o.m = e.target.value; if (o.m === 'cust' && o.cust == null) o.cust = 10; changed(); });
+  on('sbCust', 'change', e => { pushUndo(); selObj().cust = +e.target.value || 0; changed(); });
+  on('sbOpen', 'change', e => { e.target.blur(); pushUndo(); selObj().open = e.target.checked; changed(); });
+  on('sbOn', 'change', e => { e.target.blur(); pushUndo(); P.rus.find(q => q.id === st.sel.id).on = e.target.checked; changed(); });
+  on('sbMeas', 'change', e => { pushUndo(); P.pts.find(q => q.id === st.sel.id).meas = e.target.value === '' ? null : +e.target.value; changed(); });
+  on('sbEdit', 'click', () => { setTab('ru', true); const c = $('.rucard.cur'); if (c) c.scrollIntoView({ block: 'nearest' }); });
+  on('sbDel', 'click', () => { pushUndo(); const s = st.sel; if (s.t === 'obj') P.objs = P.objs.filter(o => o.id !== s.id); if (s.t === 'ru') P.rus = P.rus.filter(o => o.id !== s.id); if (s.t === 'pt') P.pts = P.pts.filter(o => o.id !== s.id); st.sel = null; changed(); });
+  on('sbAdd', 'click', () => { pushUndo(); const q = { id: uid(), x: st.probe.x, y: st.probe.y, meas: null }; P.pts.push(q); st.probe = null; st.sel = { t: 'pt', id: q.id }; changed(); });
+  on('sbX', 'click', () => { st.probe = null; renderSel(); draw(); });
+}
+
+/* ---- panel: tabs ---- */
+let curTab = 'plan';
+function setTab(t, open) {
+  const p = $('#panel');
+  if (t === curTab && !open && window.matchMedia('(max-width:1023px)').matches) p.classList.toggle('peek'); else p.classList.remove('peek');
+  curTab = t; $$('#tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === t)); $$('.pbody>section').forEach(s => s.classList.toggle('on', s.dataset.tab === t));
+}
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); });
+$('#handle').onclick = () => $('#panel').classList.toggle('peek');
+
+/* ---- panel: plan tab ---- */
+function renderPlan() {
+  projList();
+  $('#planInfo').innerHTML = IMG || store.get('img:' + P.id, null) ? '底圖已載入。換圖時，已經畫好的牆和 RU 會保留。' : P.demo ? '這是示範平面，沒有底圖。上傳自己的平面圖會建立在目前這個專案上；想保留示範，先按「新增空白」。' : '還沒有底圖。可以上傳平面圖照著描，也可以直接在方格上畫（每格 1 m）。';
+  $('#scaleInfo').innerHTML = P.scaleSet ? `已設定：整張圖寬 <b>${fmt(P.w * P.mpp, 1)} m</b>、高 <b>${fmt(P.h * P.mpp, 1)} m</b>。` : `<span class="warn">還沒設定。</span>目前暫時當作整張圖寬 ${fmt(P.w * P.mpp, 1)} m。距離不對，覆蓋結果就不對，請先量一段已知長度。`;
+  const [a, b, c, d] = areaBox();
+  $('#areaInfo').innerHTML = (P.area ? '自己框選的範圍：' : P.objs.length ? '全部牆面的外框：' : '整張圖：') + `<b>${fmt((c - a) * P.mpp, 1)} × ${fmt((d - b) * P.mpp, 1)} m</b>。熱圖和統計只算這個範圍。`;
+  $('#rmPlan').disabled = !IMG; $('#clrArea').disabled = !P.area;
+}
+$('#setScale').onclick = () => { setTool('scale'); $('#panel').classList.add('peek'); };
+$('#setArea').onclick = () => { setTool('area'); $('#panel').classList.add('peek'); };
+$('#clrArea').onclick = () => { pushUndo(); P.area = null; changed(); };
+function askScale(lenU) {
+  sheet('這兩點實際相距多遠？', `<p>圖上量到 ${fmt(lenU, 0)} 個像素。</p><label class="f">實際距離（公尺）<input type="number" id="shDist" step="0.01" min="0.1" inputmode="decimal"></label><div class="btns"><button type="button" class="primary" id="shOk">套用</button></div>`, () => {
+    const i = $('#shDist'); i.focus();
+    const go = () => { const v = +i.value; if (!(v > 0)) { toast('請輸入大於 0 的公尺數。'); return; } pushUndo(); P.mpp = v / lenU; P.scaleSet = true; closeSheet(); setTool('sel'); changed(); toast(`比例尺已設定：整張圖寬 ${fmt(P.w * P.mpp, 1)} m。`); };
+    $('#shOk').onclick = go; i.onkeydown = e => { if (e.key === 'Enter') go(); };
+  });
+  draw();
+}
+$('#expProj').onclick = () => {
+  const data = JSON.stringify({ app: 'SiteLens indoor', version: IND_VERSION, project: P, image: store.get('img:' + P.id, null) || (IMG ? IMG.src : null) });
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+  sheet('匯出專案檔', `<p>下載成檔案，或複製內容貼到別處。檔案包含底圖、牆面、RU、測點和所有參數。</p><div class="btns"><a id="shDl" download="${esc(P.name.replace(/[\\/:*?"<>|]/g, '_'))}.sitelens-indoor.json" href="${url}"><button type="button" class="primary" tabindex="-1">下載檔案</button></a><button type="button" id="shCopy">複製內容</button></div>`,
+    () => { $('#shCopy').onclick = async () => { try { await navigator.clipboard.writeText(data); toast('已複製。'); } catch (e) { toast('這個瀏覽器不允許複製，請用「下載檔案」。'); } }; });
+};
+$('#impProj').onclick = () => sheet('匯入專案檔', `<p>選擇之前匯出的 .json 檔，或把內容貼在下面。匯入會新增一個平面，不會蓋掉現有的。</p><div class="btns"><button type="button" class="primary" id="shPick">選擇檔案</button></div><textarea id="shTxt" placeholder="或貼上專案檔內容"></textarea><div class="btns"><button type="button" id="shOk">匯入貼上的內容</button></div>`,
+  () => { $('#shPick').onclick = () => $('#fProj').click(); $('#shOk').onclick = () => importText($('#shTxt').value); });
+$('#fProj').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (f) importText(await f.text()); };
+function importText(txt) {
+  try {
+    const j = JSON.parse(txt), p = j.project; if (!p || !Array.isArray(p.objs) || !Array.isArray(p.rus)) throw 0;
+    p.id = uid(); store.set('p:' + p.id, p); if (j.image) store.set('img:' + p.id, j.image);
+    closeSheet(); loadProj(p.id); save(); toast(`已匯入「${p.name}」。`);
+  } catch (e) { toast('這不是 SiteLens 室內專案檔。請選擇用「匯出專案檔」產生的 .json。'); }
+}
+
+/* ---- panel: materials ---- */
+function renderMats() {
+  const f = fGHz();
+  $('#matTbl').innerHTML = `<tr><th>材質</th><th>${fmt(P.cfg.f)} MHz 的損耗 dB</th><th>預設</th></tr>` + Object.entries(IN.MATS).filter(([id]) => id !== 'cust').map(([id, m]) =>
+    `<tr><td><i class="sw" style="background:${m.c}"></i>${esc(m.n)}<small>${esc(m.src)}</small></td><td><input type="number" data-mat="${id}" step="0.5" min="0" value="${fmt(IN.matLoss(id, f, P.matOv), 1)}" aria-label="${esc(m.n)} 損耗"></td><td>${fmt(m.a + m.b * f, 1)}${Number.isFinite(P.matOv[id]) ? `<small><button type="button" data-rst="${id}" style="all:unset;cursor:pointer;color:var(--accent);text-decoration:underline">還原</button></small>` : ''}</td></tr>`).join('');
+  const n = k => P.objs.filter(o => o.k === k).length;
+  $('#objInfo').innerHTML = `牆 <b>${n('wall')}</b> 段、門 <b>${n('door')}</b> 扇（其中 ${P.objs.filter(o => o.k === 'door' && o.open).length} 扇開著）、電梯／箱體 <b>${n('rect')}</b> 個。`;
+  $('#clrObjs').disabled = !P.objs.length;
+}
+$('#matTbl').addEventListener('change', e => { const id = e.target.dataset.mat; if (!id) return; pushUndo(); const v = +e.target.value; if (e.target.value === '' || !(v >= 0)) delete P.matOv[id]; else P.matOv[id] = v; changed(true); });
+$('#matTbl').addEventListener('click', e => { const id = e.target.dataset.rst; if (!id) return; delete P.matOv[id]; changed(true); });
+$('#clrObjs').onclick = () => confirmSheet('清除全部牆、門、電梯？', 'RU、測點和底圖會保留。清除後可以按「復原」拿回來。', '清除', () => { pushUndo(); P.objs = []; st.sel = null; changed(); });
+
+/* ---- panel: RU tab ---- */
+function cfgToUI() {
+  const c = P.cfg;
+  $('#band').innerHTML = Object.entries(BANDS).map(([k, b]) => `<option value="${k}"${c.band === k ? ' selected' : ''}>${b.lbl}</option>`).join('');
+  $('#freq').value = c.f; $('#scs').value = c.scs; bwOpts();
+  $('#pln').value = c.n; $('#extra').value = c.extra; $('#ueH').value = c.ueH; $('#nf').value = c.nf; $('#load').value = c.load; $('#layers').value = c.layers; $('#dl').value = c.dl;
+}
+function bwOpts() { const t = IN.NRB[P.cfg.scs]; if (!t[P.cfg.bw]) P.cfg.bw = +Object.keys(t).pop(); $('#bw').innerHTML = Object.keys(t).map(b => `<option${+b === +P.cfg.bw ? ' selected' : ''}>${b}</option>`).join(''); }
+$('#band').onchange = e => { P.cfg.band = e.target.value; P.cfg.f = BANDS[P.cfg.band].f; $('#freq').value = P.cfg.f; changed(true); };
+$('#freq').onchange = e => { const v = +e.target.value; if (!(v >= 400 && v <= 7200)) { e.target.value = P.cfg.f; toast('頻率請填 400 到 7200 MHz 之間。'); return; } P.cfg.f = v; changed(true); };
+$('#scs').onchange = e => { P.cfg.scs = +e.target.value; bwOpts(); changed(true); };
+$('#bw').onchange = e => { P.cfg.bw = +e.target.value; changed(true); };
+[['pln', 'n'], ['extra', 'extra'], ['ueH', 'ueH'], ['nf', 'nf'], ['load', 'load'], ['layers', 'layers'], ['dl', 'dl']].forEach(([id, k]) => { $('#' + id).onchange = e => { const v = +e.target.value; if (!Number.isFinite(v)) { e.target.value = P.cfg[k]; return; } P.cfg[k] = v; changed(true); }; });
+function renderRUs() {
+  $('#ruList').innerHTML = P.rus.length ? P.rus.map((r, i) => `<div class="rucard${st.sel && st.sel.t === 'ru' && st.sel.id === r.id ? ' cur' : ''}" data-ru="${r.id}">
+    <div class="hd"><i class="dot" style="background:${RU_COL[i % RU_COL.length]}"></i><input type="text" data-k="name" value="${esc(r.name)}" maxlength="16" aria-label="RU 名稱"><label style="display:flex;gap:5px;align-items:center;font-size:12px"><input type="checkbox" data-k="on"${r.on ? ' checked' : ''}>啟用</label></div>
+    <div class="row3"><label class="f">每埠功率 dBm<input type="number" data-k="p" step="1" value="${r.p}"></label><label class="f">天線增益 dBi<input type="number" data-k="g" step="0.5" value="${r.g}"></label><label class="f">Cell<input type="number" data-k="cell" step="1" min="1" value="${r.cell}"></label></div>
+    <div class="row3"><label class="f">天線<select data-k="dir"><option value="0"${r.dir ? '' : ' selected'}>全向</option><option value="1"${r.dir ? ' selected' : ''}>定向</option></select></label>
+      <label class="f">方位角 °<input type="number" data-k="az" step="5" value="${r.az}"${r.dir ? '' : ' disabled'}></label><label class="f">水平波束寬 °<input type="number" data-k="bw" step="5" min="10" max="180" value="${r.bw}"${r.dir ? '' : ' disabled'}></label></div>
+    <div class="row3"><label class="f">安裝高度 m<input type="number" data-k="h" step="0.1" min="0" value="${r.h}"></label><span></span><button type="button" class="danger" data-k="del" style="align-self:end;min-height:38px">刪除</button></div></div>`).join('')
+    : '<p>還沒有 RU。</p>';
+}
+$('#ruList').addEventListener('change', e => {
+  const card = e.target.closest('[data-ru]'), k = e.target.dataset.k; if (!card || !k) return; const r = P.rus.find(q => q.id === card.dataset.ru); pushUndo();
+  if (k === 'name') r.name = e.target.value.trim() || r.name; else if (k === 'on') r.on = e.target.checked; else if (k === 'dir') { r.dir = e.target.value === '1'; card.querySelectorAll('[data-k=az],[data-k=bw]').forEach(i => { i.disabled = !r.dir; }); } else { const v = +e.target.value; if (Number.isFinite(v)) r[k] = k === 'az' ? ((v % 360) + 360) % 360 : v; }
+  changed();
+});
+$('#ruList').addEventListener('click', e => { if (e.target.dataset.k !== 'del') return; const id = e.target.closest('[data-ru]').dataset.ru; pushUndo(); P.rus = P.rus.filter(q => q.id !== id); if (st.sel && st.sel.id === id) st.sel = null; changed(); });
+
+/* ---- panel: coverage + points ---- */
+$('#metric').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; st.metric = b.dataset.m; $$('#metric button').forEach(x => x.setAttribute('aria-pressed', x === b)); paintHeat(); renderLegend(); draw(); });
+function renderLegend() {
+  const m = st.metric, pk = st.heat ? st.heat.peak : IN.model(P.cfg).peak;
+  const rows = m === 'srv' ? P.rus.map((r, i) => [r.name, 'Cell ' + r.cell + (r.on ? '' : '（關閉）'), RU_COL[i % RU_COL.length]])
+    : m === 'tput' ? [[0.85, 1], [0.6, 0.85], [0.35, 0.6], [0.15, 0.35], [0, 0.15]].map(([a, b], i) => [['很好', '好', '普通', '弱', '很差'][i], `${fmt(a * pk)} 至 ${fmt(b * pk)} Mbps`, RAMP.tput.stops[4 - i][1]]) : LEVELS[m];
+  $('#legend').innerHTML = rows.map(r => `<i style="background:${r[2]}"></i><span>${esc(r[0])}</span><span>${esc(r[1])}</span>`).join('') || '<span></span><span>還沒有 RU</span><span></span>';
+}
+function renderPts(M) {
+  const on = M.rus.length > 0;
+  $('#ptTbl').innerHTML = P.pts.length ? '<tr><th>測點</th><th>RSRP</th><th>SINR</th><th>Mbps</th><th>實測</th><th>差</th></tr>' + P.pts.map((q, i) => {
+    const r = on ? evalU(M, q.x, q.y) : null, d = r && q.meas != null ? r.rsrp - q.meas : null;
+    return `<tr><td>${i + 1}<small>${r ? esc(M.rus[r.ru].name) : ''}</small></td><td>${r ? fmt(r.rsrp, 1) : '—'}</td><td>${r ? fmt(r.sinr, 1) : '—'}</td><td>${r ? fmt(r.tput) : '—'}</td><td><input type="number" data-pt="${q.id}" step="1" value="${q.meas == null ? '' : q.meas}" placeholder="dBm" aria-label="測點 ${i + 1} 實測 RSRP"></td><td>${d == null ? '—' : (d > 0 ? '+' : '') + fmt(d, 1)}</td></tr>`;
+  }).join('') : '<tr><td style="font-family:var(--body);color:var(--muted)">還沒有測點。</td></tr>';
+}
+function renderCal(M) {
+  const on = M.rus.length > 0;
+  const ds = on ? P.pts.filter(q => q.meas != null).map(q => evalU(M, q.x, q.y).rsrp - q.meas) : [];
+  const mean = ds.reduce((a, b) => a + b, 0) / (ds.length || 1), sd = Math.sqrt(ds.reduce((a, b) => a + (b - mean) ** 2, 0) / (ds.length || 1));
+  $('#calInfo').innerHTML = ds.length ? `${ds.length} 個測點有實測值。預測比實測平均${mean >= 0 ? '高' : '低'} <b>${fmt(Math.abs(mean), 1)} dB</b>，離散 ±${fmt(sd, 1)} dB。目前額外損耗 ${fmt(P.cfg.extra, 1)} dB。` : '還沒有實測值。建議至少量 5 個點，直視和隔牆的位置都要有。';
+  $('#calGo').disabled = !ds.length || Math.abs(mean) < 0.05; $('#calGo').dataset.v = mean;
+}
+$('#ptTbl').addEventListener('change', e => { const id = e.target.dataset.pt; if (!id) return; pushUndo(); P.pts.find(q => q.id === id).meas = e.target.value === '' ? null : +e.target.value; changed(); });
+$('#calGo').onclick = () => { pushUndo(); P.cfg.extra = Math.round((P.cfg.extra + +$('#calGo').dataset.v) * 10) / 10; $('#extra').value = P.cfg.extra; changed(true); toast(`額外損耗改為 ${P.cfg.extra} dB。`); };
+$('#expImg').onclick = () => {
+  const [a, b, c, d] = bounds(), k = Math.min(2000 / (c - a), 2000 / (d - b), 6), pad = 20, W = Math.round((c - a) * k + 2 * pad), topH = 54, Hh = Math.round((d - b) * k + 2 * pad + topH);
+  const cnv = document.createElement('canvas'); cnv.width = W; cnv.height = Hh; const g = cnv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, Hh); g.save(); g.translate(0, topH); draw(g, { ox: a - pad / k, oy: b - pad / k, z: k }, W, Hh - topH, true); g.restore();
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, topH); g.fillStyle = '#10151b'; g.textBaseline = 'top'; g.textAlign = 'left'; g.font = '600 17px sans-serif'; g.fillText(`${P.name}　${{ rsrp: 'RSRP', sinr: 'SINR', tput: '下行速率', srv: '服務 RU' }[st.metric]}`, pad, 8);
+  g.font = '12px sans-serif'; g.fillStyle = '#44505c'; g.fillText(`${fmt(P.cfg.f)} MHz · ${P.cfg.bw} MHz · ${P.rus.filter(r => r.on).length} 個 RU · ${$('#sum').textContent} · SiteLens 室內 ${IND_VERSION}`, pad, 32);
+  const url = cnv.toDataURL('image/png');
+  sheet('覆蓋圖', `<img src="${url}" alt="覆蓋圖"><p>手機上長按圖片可以儲存或分享。</p><div class="btns"><a download="${esc(P.name.replace(/[\\/:*?"<>|]/g, '_'))}-${st.metric}.png" href="${url}"><button type="button" class="primary" tabindex="-1">下載 PNG</button></a></div>`);
+};
+
+/* ---- one place that reacts to any change ----
+   A list is not rebuilt while one of its inputs has focus: rebuilding would drop the keyboard on phones and swallow the
+   click on a neighbouring button. It is rebuilt as soon as focus leaves it. */
+const dirty = new Map();
+const busyIn = el => { const a = document.activeElement; return !!(a && el.contains(a) && /INPUT|SELECT/.test(a.tagName)); };
+function soft(el, fn) { if (busyIn(el)) dirty.set(el, fn); else { dirty.delete(el); fn(); } }
+document.addEventListener('focusout', () => setTimeout(() => dirty.forEach((fn, el) => { if (!busyIn(el)) { dirty.delete(el); fn(); } }), 0));
+function changed() {
+  save(); ui(); renderPlan(); soft($('#matTbl'), renderMats); soft($('#ruList'), renderRUs); renderLegend(); soft($('#selbar'), renderSel); draw(); recompute();
+}
+
+/* ---- version + update check (shares version.json with the outdoor page) ---- */
+$('#ver').textContent = '版本 ' + IND_VERSION;
+async function checkUpdate(manual) {
+  try { const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw 0; const j = await r.json();
+    if (j.version && j.version > IND_VERSION) { $('#updMsg').textContent = `有新版本 ${j.version.slice(5)}`; $('#updBar').hidden = false; } else if (manual) toast(`已是最新版本（${IND_VERSION}）。`);
+  } catch (e) { if (manual) toast('無法檢查更新，請確認網路連線。'); }
+}
+$('#updGo').onclick = () => { const u = new URL(location.href); u.searchParams.set('v', Date.now().toString(36)); location.replace(u.toString()); };
+$('#chkUpd').onclick = () => checkUpdate(true);
+setTimeout(() => checkUpdate(false), 2500);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#sheet').hidden) closeSheet(); else if (st.pend) { st.pend = null; st.hover = null; ui(); draw(); } else setTool('sel'); } if ((e.key === 'Delete' || e.key === 'Backspace') && st.sel && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { const b = $('#sbDel'); if (b) b.click(); } if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); $('#undo').click(); } });
+
+/* ---- start ---- */
+resize();
+loadProj(store.get('last', null));
+if (window.matchMedia('(max-width:1023px)').matches) $('#panel').classList.add('peek');
+</script>
+</body>
+</html>
