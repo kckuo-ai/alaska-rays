@@ -18,7 +18,7 @@
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--body);overflow:hidden}
 .app{display:grid;grid-template-columns:minmax(0,1fr) 420px;height:100%}
-#stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:#0b0f14}
+#stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:#1b2129}
 #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair;display:block}
 #cv.sel{cursor:default}
 button{font:500 13px var(--body);background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:6px 10px;cursor:pointer}
@@ -42,10 +42,10 @@ a{color:var(--accent);text-underline-offset:2px}
 #mats{flex:1 1 100%;min-width:0;display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 #mats::-webkit-scrollbar{display:none}
 #mats button{flex:none;display:flex;align-items:center;gap:6px;min-height:36px;background:rgba(16,21,27,.94);border-radius:18px;padding:0 12px 0 9px;white-space:nowrap}
-#mats button i{width:12px;height:12px;border-radius:3px;display:block;border:1px solid rgba(0,0,0,.5)}
+#mats button i{width:14px;height:6px;display:block;outline:1px solid rgba(255,255,255,.55)}
 #mats button small{font:11px var(--mono);color:var(--muted)}
 #mats button[aria-pressed=true]{background:#24303c;color:var(--fg);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
-#hint{position:absolute;left:124px;right:10px;bottom:8px;z-index:4;background:rgba(16,21,27,.9);border:1px solid var(--line);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--fg);pointer-events:none}
+#hint{flex:0 1 auto;max-width:100%;background:rgba(16,21,27,.9);border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:12px;color:#c5ced8;pointer-events:none!important}
 #selbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:6;background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;box-shadow:0 6px 20px rgba(0,0,0,.45)}
 #selbar .ttl{font-weight:700;font-size:13px}
 #selbar .txt{font:12px/1.5 var(--mono);color:var(--fg);flex:1 1 100%}
@@ -103,7 +103,7 @@ th:first-child,td:first-child{text-align:left;font-family:var(--body)}
 td input[type=number]{width:4.8em;padding:4px 6px;text-align:right}
 td small{display:block;color:var(--muted);font:11px var(--body)}
 .tw{overflow-x:auto}
-.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;border:1px solid rgba(0,0,0,.5);vertical-align:-1px}
+.sw{display:inline-block;width:14px;height:6px;margin-right:7px;outline:1px solid rgba(255,255,255,.55);vertical-align:2px}
 .rucard{border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
 .rucard.cur{border-color:var(--accent)}
 .rucard .hd{display:flex;align-items:center;gap:8px}
@@ -153,9 +153,9 @@ td small{display:block;color:var(--muted);font:11px var(--body)}
       </div>
       <div class="tb"><button type="button" id="undo" disabled>復原</button><button type="button" id="done" hidden>完成</button></div>
       <div id="mats" hidden></div>
+      <div style="flex:1 1 100%;height:0"></div><div id="hint"></div>
     </div>
     <div class="tb" id="zoomc"><button type="button" id="zin" aria-label="放大">＋</button><button type="button" id="zout" aria-label="縮小">−</button><button type="button" id="zfit" aria-label="全圖">⤢</button></div>
-    <div id="hint"></div>
     <div id="busy" hidden>計算中…</div>
     <div id="selbar" hidden></div>
   </main>
@@ -251,7 +251,7 @@ td small{display:block;color:var(--muted);font:11px var(--body)}
             <button type="button" data-m="srv" aria-pressed="false">服務 RU</button>
           </div>
           <div class="lv" id="legend"></div>
-          <label class="f">熱圖濃度<input type="range" id="heatA" min="0" max="100" value="62"></label>
+          <label class="f">熱圖濃度<input type="range" id="heatA" min="0" max="100" value="80"></label>
         </div>
         <div class="block">
           <h2>範圍內統計</h2>
@@ -295,17 +295,17 @@ td small{display:block;color:var(--muted);font:11px var(--body)}
 const IN = (() => {
   // loss(dB) = a + b·f(GHz). src '38.901' = 3GPP TR 38.901 Table 7.4.3-1; the rest are common indoor planning values.
   const MATS = {
-    dry:   { n: '輕隔間（石膏板）', a: 2.5, b: 0.3, c: '#58b7ff', use: 'w', src: '規劃常用值' },
-    wood:  { n: '木隔間／木門', a: 4.85, b: 0.12, c: '#c98b4b', use: 'wd', src: 'TR 38.901' },
-    glass: { n: '玻璃', a: 2, b: 0.2, c: '#2fd9c8', use: 'wd', src: 'TR 38.901' },
-    brick: { n: '磚牆', a: 6, b: 1.2, c: '#e8663f', use: 'w', src: '規劃常用值' },
-    conc:  { n: '混凝土（RC）', a: 5, b: 4, c: '#e3e8ee', use: 'wr', src: 'TR 38.901' },
-    thick: { n: '厚 RC（剪力牆、樓梯間）', a: 10, b: 5, c: '#8f99a6', use: 'wr', src: '規劃常用值' },
-    irr:   { n: '鍍膜玻璃（Low-E）', a: 23, b: 0.3, c: '#5b7dff', use: 'w', src: 'TR 38.901' },
-    metal: { n: '鐵門／防火門', a: 20, b: 0.5, c: '#ff4fa3', use: 'd', src: '規劃常用值' },
-    shut:  { n: '鐵捲門', a: 25, b: 0.5, c: '#b660ff', use: 'd', src: '規劃常用值' },
-    elev:  { n: '電梯（金屬車廂）', a: 30, b: 0, c: '#ffd23f', use: 'r', src: '規劃常用值' },
-    cust:  { n: '自訂', a: 10, b: 0, c: '#7dff8a', use: 'wdr', src: '自己填' }
+    dry:   { n: '輕隔間（石膏板）', a: 2.5, b: 0.3, c: '#7d8894', t: 0.10, use: 'w', src: '規劃常用值' },
+    wood:  { n: '木隔間／木門', a: 4.85, b: 0.12, c: '#8a6234', t: 0.08, use: 'wd', src: 'TR 38.901' },
+    glass: { n: '玻璃', a: 2, b: 0.2, c: '#1f8aa8', t: 0.10, use: 'wd', src: 'TR 38.901' },
+    brick: { n: '磚牆', a: 6, b: 1.2, c: '#9c4a36', t: 0.22, use: 'w', src: '規劃常用值' },
+    conc:  { n: '混凝土（RC）', a: 5, b: 4, c: '#2b3138', t: 0.20, use: 'wr', src: 'TR 38.901' },
+    thick: { n: '厚 RC（剪力牆、樓梯間）', a: 10, b: 5, c: '#0c0f12', t: 0.35, use: 'wr', src: '規劃常用值' },
+    irr:   { n: '鍍膜玻璃（Low-E）', a: 23, b: 0.3, c: '#2a56b8', t: 0.10, use: 'w', src: 'TR 38.901' },
+    metal: { n: '鐵門／防火門', a: 20, b: 0.5, c: '#b0235f', t: 0.06, use: 'd', src: '規劃常用值' },
+    shut:  { n: '鐵捲門', a: 25, b: 0.5, c: '#6a3fb5', t: 0.06, use: 'd', src: '規劃常用值' },
+    elev:  { n: '電梯（金屬車廂）', a: 30, b: 0, c: '#3a4047', t: 0.12, use: 'r', src: '規劃常用值' },
+    cust:  { n: '自訂', a: 10, b: 0, c: '#2f8f4e', t: 0.15, use: 'wdr', src: '自己填' }
   };
   const NRB = {
     15: { 5: 25, 10: 52, 20: 106, 40: 216, 50: 270 },
@@ -433,7 +433,7 @@ const DEF_CFG = { band: 'n79', f: 4850, bw: 100, scs: 30, nf: 7, ueH: 1.5, n: 2,
 const newProj = name => ({ id: uid(), name, mpp: 0.05, scaleSet: false, w: 800, h: 480, objs: [], rus: [], pts: [], area: null, cfg: { ...DEF_CFG }, matOv: {}, demo: false });
 let P = null, IMG = null;                 // current project, its floor-plan image element
 const st = { tool: 'sel', mat: { wall: 'conc', door: 'metal', rect: 'elev' }, pend: null, hover: null, sel: null, probe: null, metric: 'rsrp',
-  view: { ox: 0, oy: 0, z: 1 }, heat: null, undo: [], planA: 1, heatA: 0.62 };
+  view: { ox: 0, oy: 0, z: 1 }, heat: null, undo: [], planA: 1, heatA: 0.8 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(LS + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(LS + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
@@ -594,13 +594,32 @@ function compute() {
     st.heat = H; $('#busy').hidden = true; paintHeat(); afterCompute(M);
   })();
 }
+const BAND = { rsrp: { lo: -120, hi: -70, step: 5, unit: 'dBm', ttl: 'RSRP' }, sinr: { lo: -9, hi: 27, step: 3, unit: 'dB', ttl: 'SINR' }, tput: { lo: 0, hi: 1, step: 1 / 12, unit: 'Mbps', ttl: '下行速率' } };
+// Contour-band rendering: the value grid is upsampled bilinearly, each pixel is assigned to a band, and band edges get a thin darker line.
 function paintHeat() {
   const H = st.heat; if (!H) return;
-  const c = H.cv || (H.cv = document.createElement('canvas')); c.width = H.nx; c.height = H.ny;
-  const g = c.getContext('2d'), im = g.createImageData(H.nx, H.ny), d = im.data, mt = st.metric;
-  for (let k = 0; k < H.nx * H.ny; k++) {
-    const col = mt === 'srv' ? hex3(RU_COL[ruColIdx(H.ids[H.ru[k]]) % RU_COL.length]) : rampRGB(RAMP[mt].stops, mt === 'tput' ? H.tput[k] / (H.peak || 1) : H[mt][k]);
-    d[4 * k] = col[0]; d[4 * k + 1] = col[1]; d[4 * k + 2] = col[2]; d[4 * k + 3] = 255;
+  const mt = st.metric, nx = H.nx, ny = H.ny, k = Math.max(1, Math.min(8, Math.floor(Math.sqrt(1.3e6 / (nx * ny))))), W = nx * k, Hh = ny * k;
+  const c = H.cv || (H.cv = document.createElement('canvas')); c.width = W; c.height = Hh;
+  const g = c.getContext('2d'), im = g.createImageData(W, Hh), d = im.data;
+  if (mt === 'srv') {
+    const cols = H.ids.map(id => hex3(RU_COL[ruColIdx(id) % RU_COL.length]));
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { const col = cols[H.ru[((y / k) | 0) * nx + ((x / k) | 0)]], o = 4 * (y * W + x); d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = 255; }
+  } else {
+    const src = H[mt], B = BAND[mt], sc = mt === 'tput' ? 1 / (H.peak || 1) : 1, nb = Math.round((B.hi - B.lo) / B.step), lut = [];
+    for (let i = 0; i < nb; i++) lut.push(rampRGB(RAMP[mt].stops, B.lo + (i + 0.5) * B.step));
+    const idx = new Uint8Array(W * Hh);
+    for (let y = 0; y < Hh; y++) {
+      const fy = Math.max(0, Math.min(ny - 1, (y + 0.5) / k - 0.5)), y0 = fy | 0, y1 = Math.min(ny - 1, y0 + 1), ty = fy - y0;
+      for (let x = 0; x < W; x++) {
+        const fx = Math.max(0, Math.min(nx - 1, (x + 0.5) / k - 0.5)), x0 = fx | 0, x1 = Math.min(nx - 1, x0 + 1), tx = fx - x0;
+        const v = ((src[y0 * nx + x0] * (1 - tx) + src[y0 * nx + x1] * tx) * (1 - ty) + (src[y1 * nx + x0] * (1 - tx) + src[y1 * nx + x1] * tx) * ty) * sc;
+        idx[y * W + x] = Math.max(0, Math.min(nb - 1, Math.floor((v - B.lo) / B.step)));
+      }
+    }
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, b = idx[i], col = lut[b], edge = k > 1 && ((x + 1 < W && idx[i + 1] !== b) || (y + 1 < Hh && idx[i + W] !== b)), f = edge ? 0.72 : 1, o = 4 * i;
+      d[o] = col[0] * f; d[o + 1] = col[1] * f; d[o + 2] = col[2] * f; d[o + 3] = 255;
+    }
   }
   g.putImageData(im, 0, 0);
 }
@@ -625,70 +644,112 @@ function afterCompute(M) {
   soft($('#ptTbl'), () => renderPts(M)); renderCal(M); if (st.probe) st.probe.r = M.rus.length ? probeAt(M, st.probe.x, st.probe.y) : null; soft($('#selbar'), renderSel); draw();
 }
 
-/* ---- drawing ---- */
+/* ---- drawing: drafting conventions. Walls to scale in ink colours, doors as leaf + swing arc, lifts as a crossed box,
+   coverage as contour bands under the linework, colour key and scale bar on the sheet. ---- */
+const INK = '#1d242c', ACC = '#ff8a00', LBL = '11px "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace';
+function tag(g, txt, x, y, o = {}) {   // small label plate
+  g.font = LBL; g.textBaseline = 'middle'; g.textAlign = 'left';
+  const w = g.measureText(txt).width + 8, h = 16;
+  g.fillStyle = o.bg || 'rgba(255,255,255,.92)'; g.fillRect(x, y - h / 2, w, h);
+  if (o.line) { g.strokeStyle = o.line; g.lineWidth = 1; g.strokeRect(x + 0.5, y - h / 2 + 0.5, w - 1, h - 1); }
+  g.fillStyle = o.fg || INK; g.fillText(txt, x + 4, y + 0.5);
+}
 function draw(g = ctx, V = st.view, W = CW, Hh = CH, exp = false) {
   if (!P) return;
-  const X = u => (u - V.ox) * V.z, Y = u => (u - V.oy) * V.z;
-  if (!exp) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, Hh); }
-  g.fillStyle = exp ? '#ffffff' : '#0b0f14'; g.fillRect(0, 0, W, Hh);
-  // paper + metre grid, or the plan image
-  g.fillStyle = '#f3f1ec'; g.fillRect(X(0), Y(0), P.w * V.z, P.h * V.z);
-  if (IMG) { g.globalAlpha = exp ? 1 : st.planA; g.drawImage(IMG, X(0), Y(0), P.w * V.z, P.h * V.z); g.globalAlpha = 1; }
-  else {
-    const m = 1 / P.mpp, big = m * V.z < 6 ? 5 : 1; g.lineWidth = 1;
-    for (let k = 0, x = 0; x <= P.w + 1e-6; x += m * big, k += big) { g.strokeStyle = k % 5 ? '#e2ded4' : '#cfcabd'; g.beginPath(); g.moveTo(X(x), Y(0)); g.lineTo(X(x), Y(P.h)); g.stroke(); }
-    for (let k = 0, y = 0; y <= P.h + 1e-6; y += m * big, k += big) { g.strokeStyle = k % 5 ? '#e2ded4' : '#cfcabd'; g.beginPath(); g.moveTo(X(0), Y(y)); g.lineTo(X(P.w), Y(y)); g.stroke(); }
-  }
+  const X = u => (u - V.ox) * V.z, Y = u => (u - V.oy) * V.z, px = m => m / P.mpp * V.z;
+  if (!exp) { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, Hh); g.fillStyle = '#1b2129'; g.fillRect(0, 0, W, Hh); }
+  g.fillStyle = '#ffffff'; g.fillRect(X(0), Y(0), P.w * V.z, P.h * V.z);
   const H = st.heat;
   if (H && H.cv && st.heatA > 0) { g.save(); g.globalAlpha = st.heatA; g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(H.cv, X(H.a), Y(H.b), (H.c - H.a) * V.z, (H.d - H.b) * V.z); g.restore(); }
-  if (P.area) { const [a, b, c, d] = areaBox(); g.setLineDash([6, 4]); g.strokeStyle = '#10151b'; g.lineWidth = 1.5; g.strokeRect(X(a), Y(b), (c - a) * V.z, (d - b) * V.z); g.setLineDash([]); }
-  // walls, rects, doors
-  const line = (o, w, col) => { g.lineWidth = w; g.strokeStyle = col; g.beginPath(); if (o.k === 'rect') g.rect(X(o.x1), Y(o.y1), (o.x2 - o.x1) * V.z, (o.y2 - o.y1) * V.z); else { g.moveTo(X(o.x1), Y(o.y1)); g.lineTo(X(o.x2), Y(o.y2)); } g.stroke(); };
-  g.lineCap = 'round'; g.lineJoin = 'round';
-  const order = P.objs.filter(o => o.k !== 'door').concat(P.objs.filter(o => o.k === 'door'));
-  order.forEach(o => {
-    const col = IN.MATS[o.m].c, cur = st.sel && st.sel.t === 'obj' && st.sel.id === o.id, w = o.k === 'door' ? 7 : 4;
-    if (o.k === 'rect') { g.fillStyle = col + '55'; g.fillRect(X(o.x1), Y(o.y1), (o.x2 - o.x1) * V.z, (o.y2 - o.y1) * V.z); }
-    line(o, w + (cur ? 6 : 3), cur ? '#ffffff' : '#10151b');
-    if (o.k === 'door' && o.open) g.setLineDash([3, 7]);
-    line(o, w, col); g.setLineDash([]);
-    if (o.k === 'rect' && o.m === 'elev' && Math.abs(o.x2 - o.x1) * V.z > 34) { g.fillStyle = '#10151b'; g.font = '600 11px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('電梯', X((o.x1 + o.x2) / 2), Y((o.y1 + o.y2) / 2)); }
-    if (cur && !exp) [[o.x1, o.y1], [o.x2, o.y2]].forEach(([x, y]) => { g.fillStyle = '#fff'; g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.arc(X(x), Y(y), 7, 0, 7); g.fill(); g.stroke(); });
-  });
-  // test points
-  P.pts.forEach((p, i) => {
-    const cur = st.sel && st.sel.t === 'pt' && st.sel.id === p.id;
-    g.fillStyle = '#10151b'; g.strokeStyle = cur ? '#ffb347' : '#fff'; g.lineWidth = cur ? 3 : 2; g.beginPath(); g.arc(X(p.x), Y(p.y), 9, 0, 7); g.fill(); g.stroke();
-    g.fillStyle = '#fff'; g.font = '600 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, X(p.x), Y(p.y) + 0.5);
-  });
-  // probe ray
-  if (st.probe && st.probe.r && !exp) {
-    const ru = P.rus.find(r => r.id === st.probe.r.ruId);
-    if (ru) { g.strokeStyle = '#10151b'; g.lineWidth = 1.5; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(X(ru.x), Y(ru.y)); g.lineTo(X(st.probe.x), Y(st.probe.y)); g.stroke(); g.setLineDash([]); }
-    g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(st.probe.x) - 8, Y(st.probe.y)); g.lineTo(X(st.probe.x) + 8, Y(st.probe.y)); g.moveTo(X(st.probe.x), Y(st.probe.y) - 8); g.lineTo(X(st.probe.x), Y(st.probe.y) + 8); g.stroke();
+  if (IMG) { g.save(); g.globalAlpha = exp ? 1 : st.planA; g.globalCompositeOperation = 'multiply'; g.drawImage(IMG, X(0), Y(0), P.w * V.z, P.h * V.z); g.restore(); }
+  else {   // metre grid, heavier every 5 m
+    const m = 1 / P.mpp, fine = m * V.z >= 7; g.lineWidth = 1;
+    for (let k = 0; k * m <= P.w + 1e-6; k++) { if (k % 5 && !fine) continue; const x = Math.round(X(k * m)) + 0.5; g.strokeStyle = k % 5 ? 'rgba(40,52,64,.07)' : 'rgba(40,52,64,.18)'; g.beginPath(); g.moveTo(x, Y(0)); g.lineTo(x, Y(P.h)); g.stroke(); }
+    for (let k = 0; k * m <= P.h + 1e-6; k++) { if (k % 5 && !fine) continue; const y = Math.round(Y(k * m)) + 0.5; g.strokeStyle = k % 5 ? 'rgba(40,52,64,.07)' : 'rgba(40,52,64,.18)'; g.beginPath(); g.moveTo(X(0), y); g.lineTo(X(P.w), y); g.stroke(); }
   }
-  // RUs
-  P.rus.forEach((r, i) => {
-    const col = RU_COL[i % RU_COL.length], cur = st.sel && st.sel.t === 'ru' && st.sel.id === r.id, x = X(r.x), y = Y(r.y);
-    if (r.dir) { const a = (r.az - 90) * Math.PI / 180, hw = (r.bw || 65) / 2 * Math.PI / 180; g.fillStyle = col + '66'; g.strokeStyle = '#10151b'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.arc(x, y, 34, a - hw, a + hw); g.closePath(); g.fill(); g.stroke(); }
-    g.globalAlpha = r.on ? 1 : 0.45; g.fillStyle = col; g.strokeStyle = cur ? '#fff' : '#10151b'; g.lineWidth = cur ? 4 : 2.5; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1;
-    g.font = '600 12px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.lineWidth = 3; g.strokeStyle = '#fff'; g.strokeText(r.name, x, y - 13); g.fillStyle = '#10151b'; g.fillText(r.name, x, y - 13);
+  g.strokeStyle = '#aab3bd'; g.lineWidth = 1; g.strokeRect(Math.round(X(0)) + 0.5, Math.round(Y(0)) + 0.5, Math.round(P.w * V.z), Math.round(P.h * V.z));
+  if (P.area) { const [a, b, c, d] = areaBox(); g.setLineDash([8, 3, 2, 3]); g.strokeStyle = '#4a5560'; g.lineWidth = 1; g.strokeRect(X(a), Y(b), (c - a) * V.z, (d - b) * V.z); g.setLineDash([]); }
+  const isCur = o => !exp && st.sel && st.sel.t === 'obj' && st.sel.id === o.id;
+  const thin = { dry: 1, glass: 1, irr: 1, wood: 1 };
+  const wpx = o => Math.max(thin[o.m] ? 1.5 : 2.5, Math.min(16, px(IN.MATS[o.m].t)));
+  g.lineJoin = 'miter';
+  P.objs.forEach(o => {   // walls
+    if (o.k !== 'wall') return;
+    const w = wpx(o), col = isCur(o) ? ACC : IN.MATS[o.m].c;
+    g.lineCap = 'square'; g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(X(o.x1), Y(o.y1)); g.lineTo(X(o.x2), Y(o.y2)); g.stroke(); g.lineCap = 'butt';
+    if ((o.m === 'glass' || o.m === 'irr') && w >= 3) { g.strokeStyle = '#ffffff'; g.lineWidth = w - 2; g.beginPath(); g.moveTo(X(o.x1), Y(o.y1)); g.lineTo(X(o.x2), Y(o.y2)); g.stroke(); }
   });
+  P.objs.forEach(o => {   // lifts and boxes
+    if (o.k !== 'rect') return;
+    const x = X(Math.min(o.x1, o.x2)), y = Y(Math.min(o.y1, o.y2)), w = Math.abs(o.x2 - o.x1) * V.z, h = Math.abs(o.y2 - o.y1) * V.z, col = isCur(o) ? ACC : IN.MATS[o.m].c;
+    if (o.m === 'elev') { g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(x, y, w, h); } else { g.fillStyle = col; g.globalAlpha = 0.85; g.fillRect(x, y, w, h); g.globalAlpha = 1; }
+    g.strokeStyle = col; g.lineWidth = wpx(o); g.strokeRect(x, y, w, h);
+    if (o.m === 'elev') { g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y + h); g.moveTo(x + w, y); g.lineTo(x, y + h); g.stroke(); }
+  });
+  P.objs.forEach(o => {   // doors: opening in the wall, jambs, leaf, swing arc
+    if (o.k !== 'door') return;
+    const x1 = X(o.x1), y1 = Y(o.y1), x2 = X(o.x2), y2 = Y(o.y2), L = Math.hypot(x2 - x1, y2 - y1) || 1, dx = (x2 - x1) / L, dy = (y2 - y1) / L, nx = -dy, ny = dx;
+    const col = isCur(o) ? ACC : IN.MATS[o.m].c, gap = Math.max(5, Math.min(18, px(0.38))), a0 = Math.atan2(dy, dx), leaf = Math.max(2.5, gap * 0.45);
+    g.lineCap = 'butt'; g.strokeStyle = '#ffffff'; g.lineWidth = gap; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    g.strokeStyle = INK; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x1 - nx * gap / 2, y1 - ny * gap / 2); g.lineTo(x1 + nx * gap / 2, y1 + ny * gap / 2); g.moveTo(x2 - nx * gap / 2, y2 - ny * gap / 2); g.lineTo(x2 + nx * gap / 2, y2 + ny * gap / 2); g.stroke();
+    g.strokeStyle = col;
+    if (o.m === 'shut') { g.lineWidth = leaf; g.setLineDash([3, 2]); g.beginPath(); g.moveTo(x1, y1); if (o.open) g.lineTo(x1 + dx * L * 0.12, y1 + dy * L * 0.12); else g.lineTo(x2, y2); g.stroke(); g.setLineDash([]); }
+    else if (o.open) { g.lineWidth = 2; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 + nx * L, y1 + ny * L); g.stroke(); g.lineWidth = 1; g.beginPath(); g.arc(x1, y1, L, a0, a0 + Math.PI / 2); g.stroke(); }
+    else { g.lineWidth = leaf; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); g.lineWidth = 1; g.globalAlpha = 0.5; g.setLineDash([2, 3]); g.beginPath(); g.arc(x1, y1, L, a0, a0 + Math.PI / 2); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+  });
+  const so = !exp && selObj();
+  if (so) [[so.x1, so.y1], [so.x2, so.y2]].forEach(([x, y]) => { g.fillStyle = '#fff'; g.strokeStyle = ACC; g.lineWidth = 1.5; g.fillRect(X(x) - 5, Y(y) - 5, 10, 10); g.strokeRect(X(x) - 5, Y(y) - 5, 10, 10); });
+  P.pts.forEach((p, i) => {   // test points: diamond + plate
+    const cur = !exp && st.sel && st.sel.t === 'pt' && st.sel.id === p.id, x = X(p.x), y = Y(p.y);
+    g.fillStyle = cur ? ACC : INK; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x + 6, y); g.lineTo(x, y + 6); g.lineTo(x - 6, y); g.closePath(); g.fill(); g.stroke();
+    tag(g, 'P' + (i + 1), x + 8, y - 10, cur ? { line: ACC } : {});
+  });
+  if (st.probe && st.probe.r && !exp) {   // probe: ray to the serving RU
+    const ru = P.rus.find(r => r.id === st.probe.r.ruId), x = X(st.probe.x), y = Y(st.probe.y);
+    if (ru) { g.strokeStyle = INK; g.lineWidth = 1; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(ru.x), Y(ru.y)); g.lineTo(x, y); g.stroke(); g.setLineDash([]); }
+    g.strokeStyle = INK; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x - 7, y); g.lineTo(x + 7, y); g.moveTo(x, y - 7); g.lineTo(x, y + 7); g.stroke();
+    tag(g, fmt(st.probe.r.rsrp, 0).replace('-', '−') + ' dBm', x + 9, y - 11, { bg: INK, fg: '#fff' });
+  }
+  P.rus.forEach((r, i) => {   // RUs: ring symbol, sector outline for directional, name plate
+    const col = r.on ? RU_COL[i % RU_COL.length] : '#9aa3ad', cur = !exp && st.sel && st.sel.t === 'ru' && st.sel.id === r.id, x = X(r.x), y = Y(r.y);
+    if (r.dir) {
+      const a = (r.az - 90) * Math.PI / 180, hw = (r.bw || 65) / 2 * Math.PI / 180, R = 30;
+      g.strokeStyle = INK; g.lineWidth = 1; g.beginPath(); g.moveTo(x + Math.cos(a - hw) * R, y + Math.sin(a - hw) * R); g.lineTo(x, y); g.lineTo(x + Math.cos(a + hw) * R, y + Math.sin(a + hw) * R); g.stroke();
+      g.beginPath(); g.arc(x, y, R, a - hw, a + hw); g.stroke();
+      g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * (R + 8), y + Math.sin(a) * (R + 8)); g.stroke();
+    }
+    if (cur) { g.strokeStyle = ACC; g.lineWidth = 1.5; g.strokeRect(x - 12.5, y - 12.5, 25, 25); }
+    g.fillStyle = '#fff'; g.strokeStyle = INK; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, 8, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = col; g.beginPath(); g.arc(x, y, 4.5, 0, 7); g.fill(); g.strokeStyle = INK; g.lineWidth = 1; g.stroke();
+    tag(g, r.name + (r.on ? '' : ' 關'), x + 12, y - 13, { bg: INK, fg: '#fff' });
+  });
+  drawKey(g, W, Hh, exp);
   if (exp) return;
-  // in-progress segment / rectangle
-  if (st.pend) {
-    const p = st.pend, h = st.hover; g.fillStyle = '#ffb347'; g.strokeStyle = '#10151b'; g.lineWidth = 2; g.beginPath(); g.arc(X(p.x), Y(p.y), 6, 0, 7); g.fill(); g.stroke();
+  if (st.pend) {   // in-progress segment / rectangle
+    const p = st.pend, h = st.hover; g.fillStyle = ACC; g.fillRect(X(p.x) - 4, Y(p.y) - 4, 8, 8);
     if (h) {
-      g.strokeStyle = '#ffb347'; g.lineWidth = 2; g.setLineDash([6, 4]); g.beginPath();
+      g.strokeStyle = ACC; g.lineWidth = 1.5; g.setLineDash([5, 3]); g.beginPath();
       if (st.tool === 'rect' || st.tool === 'area') g.rect(X(p.x), Y(p.y), (h.x - p.x) * V.z, (h.y - p.y) * V.z); else { g.moveTo(X(p.x), Y(p.y)); g.lineTo(X(h.x), Y(h.y)); }
       g.stroke(); g.setLineDash([]);
-      const L = Math.hypot(h.x - p.x, h.y - p.y) * P.mpp; g.font = '600 12px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.lineWidth = 3; g.strokeStyle = '#10151b'; g.strokeText(fmt(L, 2) + ' m', X(h.x) + 10, Y(h.y) - 8); g.fillStyle = '#ffb347'; g.fillText(fmt(L, 2) + ' m', X(h.x) + 10, Y(h.y) - 8);
+      tag(g, fmt(Math.hypot(h.x - p.x, h.y - p.y) * P.mpp, 2) + ' m', X(h.x) + 10, Y(h.y) - 12, { bg: ACC, fg: '#1a1205' });
     }
   }
-  // scale bar
-  const target = 100 / V.z * P.mpp, nice = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2].find(v => v <= target) || 0.1, bl = nice / P.mpp * V.z, bx = 12, by = Hh - 16;
-  g.strokeStyle = '#e4e9ee'; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, by - 5); g.lineTo(bx, by); g.lineTo(bx + bl, by); g.lineTo(bx + bl, by - 5); g.stroke();
-  g.fillStyle = '#e4e9ee'; g.font = '11px sans-serif'; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(nice + ' m' + (P.scaleSet ? '' : '（未校正）'), bx + 4, by - 3);
+}
+// scale bar (left) and colour key (right) along the bottom edge
+function drawKey(g, W, Hh, exp) {
+  const fg = exp ? INK : '#dfe5eb', sub = exp ? '#4a5560' : '#9aa7b4', by = Hh - 12;
+  const z = exp ? exp.z : st.view.z, target = 100 / z * P.mpp, nice = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2].find(v => v <= target) || 0.1, bl = nice / P.mpp * z, bx = 12;
+  g.fillStyle = fg; g.fillRect(bx, by - 3, bl / 2, 3); g.strokeStyle = fg; g.lineWidth = 1; g.strokeRect(bx + 0.5, by - 2.5, bl - 1, 2);
+  g.font = LBL; g.textBaseline = 'bottom'; g.textAlign = 'left'; g.fillText('0', bx, by - 5); g.fillText(nice + ' m' + (P.scaleSet ? '' : '（未校正）'), bx + bl + 6, by + 2);
+  const mt = st.metric; if (!st.heat || mt === 'srv') return;
+  const B = BAND[mt], nb = Math.round((B.hi - B.lo) / B.step), kw = Math.min(190, W - bl - 150), x0 = W - 12 - kw, cw = kw / nb, sc = mt === 'tput' ? st.heat.peak : 1;
+  if (kw < 110) return;
+  for (let i = 0; i < nb; i++) { const c = rampRGB(RAMP[mt].stops, B.lo + (i + 0.5) * B.step); g.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`; g.fillRect(x0 + i * cw, by - 6, Math.ceil(cw), 6); }
+  g.strokeStyle = sub; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by - 6.5, kw - 1, 7);
+  g.fillStyle = fg; g.font = LBL; g.textBaseline = 'bottom';
+  const ticks = mt === 'rsrp' ? [-120, -100, -80] : mt === 'sinr' ? [-9, 9, 27] : [0, 0.5, 1];
+  ticks.forEach((t, i) => { g.textAlign = i === 0 ? 'left' : i === ticks.length - 1 ? 'right' : 'center'; g.fillText(mt === 'tput' ? fmt(t * sc) : String(t).replace('-', '−'), x0 + (t - B.lo) / (B.hi - B.lo) * kw, by - 9); });
+  g.textAlign = 'right'; g.fillStyle = sub; g.fillText(B.ttl + ' ' + B.unit, x0 - 8, by + 2);
 }
 
 /* ---- snapping and hit tests (all in plan units) ---- */
@@ -959,9 +1020,9 @@ function renderCal(M) {
 $('#ptTbl').addEventListener('change', e => { const id = e.target.dataset.pt; if (!id) return; pushUndo(); P.pts.find(q => q.id === id).meas = e.target.value === '' ? null : +e.target.value; changed(); });
 $('#calGo').onclick = () => { pushUndo(); P.cfg.extra = Math.round((P.cfg.extra + +$('#calGo').dataset.v) * 10) / 10; $('#extra').value = P.cfg.extra; changed(true); toast(`額外損耗改為 ${P.cfg.extra} dB。`); };
 $('#expImg').onclick = () => {
-  const [a, b, c, d] = bounds(), k = Math.min(2000 / (c - a), 2000 / (d - b), 6), pad = 20, W = Math.round((c - a) * k + 2 * pad), topH = 54, Hh = Math.round((d - b) * k + 2 * pad + topH);
+  const [a, b, c, d] = bounds(), k = Math.min(2000 / (c - a), 2000 / (d - b), 6), pad = 20, W = Math.round((c - a) * k + 2 * pad), topH = 54, Hh = Math.round((d - b) * k + 2 * pad + topH + 34);
   const cnv = document.createElement('canvas'); cnv.width = W; cnv.height = Hh; const g = cnv.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, W, Hh); g.save(); g.translate(0, topH); draw(g, { ox: a - pad / k, oy: b - pad / k, z: k }, W, Hh - topH, true); g.restore();
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, Hh); g.save(); g.translate(0, topH); draw(g, { ox: a - pad / k, oy: b - pad / k, z: k }, W, Hh - topH, { z: k }); g.restore();
   g.fillStyle = '#fff'; g.fillRect(0, 0, W, topH); g.fillStyle = '#10151b'; g.textBaseline = 'top'; g.textAlign = 'left'; g.font = '600 17px sans-serif'; g.fillText(`${P.name}　${{ rsrp: 'RSRP', sinr: 'SINR', tput: '下行速率', srv: '服務 RU' }[st.metric]}`, pad, 8);
   g.font = '12px sans-serif'; g.fillStyle = '#44505c'; g.fillText(`${fmt(P.cfg.f)} MHz · ${P.cfg.bw} MHz · ${P.rus.filter(r => r.on).length} 個 RU · ${$('#sum').textContent} · SiteLens 室內 ${IND_VERSION}`, pad, 32);
   const url = cnv.toDataURL('image/png');
